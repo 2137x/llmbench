@@ -35,6 +35,7 @@ import com.twojstar.llmbench.data.model.webChatSections
 import com.twojstar.llmbench.data.security.TextInspectionResult
 import com.twojstar.llmbench.data.security.TextInspector
 import com.twojstar.llmbench.navigation.LlmBenchQuickActionNavigation
+import com.twojstar.llmbench.share.CreateMessageAppAction
 import com.twojstar.llmbench.share.IncomingSharePayload
 import com.twojstar.llmbench.share.PendingWebShare
 import com.twojstar.llmbench.share.canOpenInMarkdownWorkspace
@@ -251,6 +252,10 @@ class MainActivity : ComponentActivity() {
             Intent.ACTION_PROCESS_TEXT -> normalizeIncomingSharePayload(
                 text = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString(),
                 uriStrings = emptyList()
+            )
+            CreateMessageAppAction.ACTION -> CreateMessageAppAction.payload(
+                action = intent.action,
+                text = intent.getCharSequenceExtra(CreateMessageAppAction.EXTRA_TEXT),
             )
             else -> null
         } ?: return
