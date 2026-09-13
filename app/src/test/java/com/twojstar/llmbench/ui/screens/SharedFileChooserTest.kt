@@ -21,6 +21,8 @@ class SharedFileChooserTest {
         assertTrue(fileChooserAcceptsMimeType(arrayOf("*/*"), null))
         assertTrue(fileChooserAcceptsMimeType(arrayOf(PDF_MIME_TYPE), PDF_MIME_TYPE))
         assertTrue(fileChooserAcceptsMimeType(arrayOf("image/*"), "image/png"))
+        assertTrue(fileChooserAcceptsMimeType(arrayOf("audio/*"), "audio/mpeg"))
+        assertTrue(fileChooserAcceptsMimeType(arrayOf("video/*"), "video/mp4"))
         assertTrue(
             fileChooserAcceptsMimeType(
                 arrayOf("image/*, application/pdf"),
