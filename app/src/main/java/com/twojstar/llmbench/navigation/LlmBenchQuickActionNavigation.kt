@@ -1,4 +1,4 @@
-package com.twojstar.llmbench.widget
+package com.twojstar.llmbench.navigation
 
 import android.content.Context
 import android.content.Intent
@@ -6,9 +6,11 @@ import android.net.Uri
 import com.twojstar.llmbench.MainActivity
 import com.twojstar.llmbench.ui.viewmodel.NavigationTab
 
-internal object LlmBenchWidgetNavigation {
-    const val ACTION_OPEN_DESTINATION = "com.twojstar.llmbench.action.OPEN_WIDGET_DESTINATION"
-    const val EXTRA_DESTINATION = "com.twojstar.llmbench.extra.WIDGET_DESTINATION"
+internal object LlmBenchQuickActionNavigation {
+    const val ACTION_OPEN_DESTINATION = "com.twojstar.llmbench.action.OPEN_DESTINATION"
+    const val EXTRA_DESTINATION = "com.twojstar.llmbench.extra.DESTINATION"
+    const val LEGACY_WIDGET_ACTION_OPEN_DESTINATION = "com.twojstar.llmbench.action.OPEN_WIDGET_DESTINATION"
+    const val LEGACY_WIDGET_EXTRA_DESTINATION = "com.twojstar.llmbench.extra.WIDGET_DESTINATION"
 
     const val DESTINATION_WEB_AI = "web_ai"
     const val DESTINATION_COMPARE = "compare"
@@ -17,10 +19,16 @@ internal object LlmBenchWidgetNavigation {
     fun launchIntent(context: Context, destination: String): Intent =
         Intent(context, MainActivity::class.java).apply {
             action = ACTION_OPEN_DESTINATION
-            data = Uri.parse("llmbench://widget/$destination")
+            data = Uri.parse("llmbench://quick-action/$destination")
             putExtra(EXTRA_DESTINATION, destination)
             addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         }
+
+    fun isOpenDestinationAction(value: String?): Boolean =
+        value == ACTION_OPEN_DESTINATION || value == LEGACY_WIDGET_ACTION_OPEN_DESTINATION
+
+    fun destinationId(currentExtra: String?, legacyExtra: String?, dataLastPathSegment: String?): String? =
+        currentExtra ?: legacyExtra ?: dataLastPathSegment
 
     fun destination(value: String?): NavigationTab? = when (value) {
         DESTINATION_WEB_AI -> NavigationTab.WEB_CHATS
