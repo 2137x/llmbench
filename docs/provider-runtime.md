@@ -4,7 +4,7 @@ This document tracks provider runtime constraints and technical TODOs. The WebVi
 
 ## Product priority
 
-LlmBench is account-backed web chat first. Work that improves the normal ChatGPT, Claude, Gemini, DeepSeek, Kimi, Vibe and other provider web experiences takes priority over adding more API-key-only surfaces. Native/API chat remains useful for compare, diagnostics and provider experiments, but it is the secondary path when priorities compete.
+Aistee is account-backed web chat first. Work that improves the normal ChatGPT, Claude, Gemini, DeepSeek, Kimi, Vibe and other provider web experiences takes priority over adding more API-key-only surfaces. Native/API chat remains useful for compare, diagnostics and provider experiments, but it is the secondary path when priorities compete.
 
 For WebViews, prefer verified provider behavior over speculative DOM hooks: keep session/login handling provider-owned, preserve uploads and focused-composer insertion, and add activity selectors only after the provider surface is verified.
 
@@ -53,7 +53,7 @@ Example: Gemini 3 documentation recommends keeping temperature at the default `1
 
 ### Gemini
 
-The REST path remains stateless, but LlmBench now retains the full model `Content` chunks returned by Gemini alongside visible text. Subsequent Gemini turns replay those model-owned chunks unchanged, including an empty-text final part when it carries `thoughtSignature`. This mirrors the GenerateContent SDK behavior while preserving the existing local/provider-scoped history boundary.
+The REST path remains stateless, but Aistee now retains the full model `Content` chunks returned by Gemini alongside visible text. Subsequent Gemini turns replay those model-owned chunks unchanged, including an empty-text final part when it carries `thoughtSignature`. This mirrors the GenerateContent SDK behavior while preserving the existing local/provider-scoped history boundary.
 
 `providerReplayState` is ephemeral opaque transport state: it is excluded from `ModelChatMessage` serialization and is never rendered as chat text, exported to Markdown, logged, or rewritten. It is replayed and charged against the history budget only for the exact model that produced it; model switches and invalid/legacy state fall back to the existing visible-text reconstruction instead of making the chat unusable. Streaming capture runs through the terminal `STOP` event so signature-only final chunks are not dropped.
 
@@ -61,7 +61,7 @@ A future move to Gemini Interactions can still be evaluated, but only with an ex
 
 ### OpenAI
 
-The Responses API remains client-managed and stateless with `store=false`. LlmBench requests `reasoning.encrypted_content`, retains the complete ordered `response.output` array as ephemeral provider replay state, and sends those output items back between the matching user turns on the next request. This preserves encrypted reasoning items without exposing or rewriting their contents.
+The Responses API remains client-managed and stateless with `store=false`. Aistee requests `reasoning.encrypted_content`, retains the complete ordered `response.output` array as ephemeral provider replay state, and sends those output items back between the matching user turns on the next request. This preserves encrypted reasoning items without exposing or rewriting their contents.
 
 OpenAI replay state follows the same privacy and bounding rules as Gemini state: it is transient, provider/model-scoped, charged against the history budget only when valid and replayable, and falls back to visible assistant text after a model switch or malformed state. Streaming captures the final output array from `response.completed`, where the complete Response object is available.
 
@@ -69,7 +69,7 @@ A stateful alternative remains `previous_response_id`. If stateful Responses are
 
 ### Claude
 
-Claude reasoning is model-aware through the Anthropic Models API. LlmBench reads `capabilities.thinking.types` and effort support from the same short model-metadata lookup used for `max_tokens`: adaptive-capable models receive `thinking: {type: "adaptive"}` and high effort only when reported, while legacy extended-thinking models receive a conservative budget only when `budget_tokens < max_tokens` can be satisfied. If metadata is unavailable or incomplete, generation uses the 2048 compatibility output limit and omits explicit thinking/effort controls rather than guessing capability support from the model name. That conservative outage entry is cached only briefly before metadata is retried.
+Claude reasoning is model-aware through the Anthropic Models API. Aistee reads `capabilities.thinking.types` and effort support from the same short model-metadata lookup used for `max_tokens`: adaptive-capable models receive `thinking: {type: "adaptive"}` and high effort only when reported, while legacy extended-thinking models receive a conservative budget only when `budget_tokens < max_tokens` can be satisfied. If metadata is unavailable or incomplete, generation uses the 2048 compatibility output limit and omits explicit thinking/effort controls rather than guessing capability support from the model name. That conservative outage entry is cached only briefly before metadata is retried.
 
 Models API aliases are resolved to the returned concrete `id`. Successful alias metadata is reused briefly, while requests and replay scoping are pinned to that concrete model so an alias retarget cannot mix opaque thinking state across models. Buffered and streaming Messages responses can still report the actual serving model; a mismatch invalidates the linked requested/concrete cache entries.
 
@@ -79,13 +79,13 @@ The current native path does not expose client tools, so streaming replay only m
 
 ### Gateways
 
-OpenRouter and other OpenAI-compatible gateways may return the model actually used. LlmBench captures that response metadata when present and falls back to the requested model/route otherwise, so aliases such as `openrouter/free` can show the actual responder.
+OpenRouter and other OpenAI-compatible gateways may return the model actually used. Aistee captures that response metadata when present and falls back to the requested model/route otherwise, so aliases such as `openrouter/free` can show the actual responder.
 
 ## Usage and comparison metadata
 
 Native/API responses retain provider-reported usage next to the existing local wall-clock latency. The portable message metadata normalizes input, output and total tokens while preserving optional cached-input and reasoning-token counts. Claude input includes direct, cache-creation and cache-read tokens so its normalized input matches Anthropic's billing/accounting semantics; Gemini keeps `thoughtsTokenCount` separate while preserving the provider's `totalTokenCount`.
 
-Costs are recorded only when the response reports them. LlmBench does not estimate provider prices in this path. OpenRouter requests usage accounting explicitly and may therefore supply a reported USD cost; other OpenAI-compatible gateways are parsed opportunistically when they return compatible usage fields. Hidden reasoning content remains opaque and is never exposed by these counters.
+Costs are recorded only when the response reports them. Aistee does not estimate provider prices in this path. OpenRouter requests usage accounting explicitly and may therefore supply a reported USD cost; other OpenAI-compatible gateways are parsed opportunistically when they return compatible usage fields. Hidden reasoning content remains opaque and is never exposed by these counters.
 
 ## Web/account-chat TODO
 

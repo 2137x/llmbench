@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "LlmBench"
+rootProject.name = "Aistee"
 include(":app", ":shared")

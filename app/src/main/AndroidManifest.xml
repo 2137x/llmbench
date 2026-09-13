@@ -14,7 +14,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.LlmBench">
+        android:theme="@style/Theme.Aistee">
         <meta-data
             android:name="android.webkit.WebView.EnableSafeBrowsing"
             android:value="true" />
@@ -24,7 +24,7 @@
             android:launchMode="singleTask"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
             android:windowSoftInputMode="adjustResize"
-            android:theme="@style/Theme.LlmBench">
+            android:theme="@style/Theme.Aistee">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -61,17 +61,17 @@
                 android:resource="@xml/shortcuts" />
         </activity>
         <receiver
-            android:name=".widget.LlmBenchWidgetReceiver"
+            android:name=".widget.AisteeWidgetReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/llmbench_widget_info" />
+                android:resource="@xml/aistee_widget_info" />
         </receiver>
         <service
-            android:name=".LlmBenchTileService"
+            android:name=".AisteeTileService"
             android:exported="true"
             android:icon="@drawable/ic_quick_settings"
             android:label="@string/app_name"

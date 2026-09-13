@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">LlmBench</string>
+    <string name="app_name">Aistee</string>
     <string name="widget_description">Quick access to Web AI, Compare, and Studio.</string>
     <string name="shortcut_web_ai_short">Web AI</string>
     <string name="shortcut_web_ai_long">Open Web AI</string>

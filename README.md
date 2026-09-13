@@ -1,16 +1,16 @@
 <a href="https://deepwiki.com/travnie/llmbench"><img src="https://deepwiki.com/badge.svg" alt="DeepWiki"></a> <a href="https://doi.org/10.5281/zenodo.22307997"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.22307997.svg" alt="DOI"></a>
 
-# LlmBench
+# Aistee
 
 Kotlin Multiplatform workspace for using multiple AI services from one client without turning every provider into a separate installed app.
 
 > Status: early prototype. Android is the first client; shared domain/provider logic is moving to Kotlin Multiplatform so desktop and iOS clients can reuse the same core.
 
-Rolling Android build: [download the signed APK](https://github.com/travnie/llmbench/releases/download/llmbench-latest/llmbench.apk). The asset is replaced after each successful release build from `main`.
+Rolling Android build: [download the signed APK](https://github.com/travnie/llmbench/releases/download/aistee-latest/aistee.apk). The asset is replaced after each successful release build from `main`.
 
 ## What it is
 
-LlmBench is intended to combine three layers:
+Aistee is intended to combine three layers:
 
 1. **Web accounts** — persistent WebView tabs for services where the user signs in with their normal account.
 2. **Free/native providers** — a shared chat/compare surface for API-compatible free providers such as OpenRouter-style endpoints.
@@ -18,7 +18,7 @@ LlmBench is intended to combine three layers:
 
 The first prototype already contains Compose UI, persistent per-provider WebViews, a native comparison chat, profile/instruction rendering, YAML editing and a small skills/docs browser.
 
-On Android, LlmBench also appears in the system share sheet for text, images and application files. Shared content is routed to a chosen web provider; text uses the existing focused-empty-composer bridge, while granted content URIs are staged for the provider's next compatible file chooser and require an explicit one-time confirmation before delivery to the embedded page.
+On Android, Aistee also appears in the system share sheet for text, images and application files. Shared content is routed to a chosen web provider; text uses the existing focused-empty-composer bridge, while granted content URIs are staged for the provider's next compatible file chooser and require an explicit one-time confirmation before delivery to the embedded page.
 
 ## Initial provider targets
 
@@ -43,7 +43,7 @@ The native/free-provider layer supports OpenRouter Free and AIHubMix through the
 
 ## Provider support matrix
 
-Full means the LlmBench-side integration is implemented; provider-side login or page changes can still affect an embedded web client. Partial calls out a known limitation rather than hiding it.
+Full means the Aistee-side integration is implemented; provider-side login or page changes can still affect an embedded web client. Partial calls out a known limitation rather than hiding it.
 
 | Provider / surface | Status | Authentication | Uploads | Activity tracking | Notes |
 | --- | --- | --- | --- | --- | --- |
@@ -69,15 +69,15 @@ Google documents the embedded-user-agent restriction in its [OAuth 2.0 policies]
 
 ## WebView approach
 
-Account sessions persist, but LlmBench must not keep every heavy provider SPA alive forever. The Android host uses a small LRU pool, pauses inactive WebViews and evicts them under memory pressure while cookies/session state remain provider-owned. Provider tweaks live in a small, auditable in-app registry: scripts are static, scoped to the matching provider host and applied after page load; remote userscript code is never fetched.
+Account sessions persist, but Aistee must not keep every heavy provider SPA alive forever. The Android host uses a small LRU pool, pauses inactive WebViews and evicts them under memory pressure while cookies/session state remain provider-owned. Provider tweaks live in a small, auditable in-app registry: scripts are static, scoped to the matching provider host and applied after page load; remote userscript code is never fetched.
 
 Provider diagnostics expose only the provider host, WebView package/version, capability counts, activity-tracking support and file-picker events. They never collect page text, full URLs, form values, file names, cookies or authentication tokens.
 
-LlmBench must not scrape passwords, session cookies, OAuth tokens or other login credentials. Authentication remains between the embedded provider page and that provider.
+Aistee must not scrape passwords, session cookies, OAuth tokens or other login credentials. Authentication remains between the embedded provider page and that provider.
 
 ## Relationship to `.ai`
 
-[`trvny/.ai`](https://github.com/trvny/.ai) remains the canonical portable AI configuration core. This repository contains the multiplatform LlmBench core plus platform clients; Android is the first shipping client.
+[`trvny/.ai`](https://github.com/trvny/.ai) remains the canonical portable AI configuration core. This repository contains the multiplatform Aistee core plus platform clients; Android is the first shipping client.
 
 ```text
 trvny/.ai             reusable profiles / instructions / skills
@@ -111,12 +111,12 @@ Technical details for native provider transport, conversation state, Prompt Stud
 
 Backends are optional, not the default. If a feature truly needs one, prefer a tiny stateless service and evaluate Cloudflare, Google Cloud, AWS or Oracle free tiers based on the actual requirement rather than choosing infrastructure first.
 
-**No account wall:** LlmBench itself must remain useful without an LlmBench account, cloud sync or hosted backup. Provider logins/API keys are required only for the providers the user explicitly chooses. Local chats, projects, files, tools, settings, import/export and manual backup/restore stay available locally. Any future LlmBench cloud/sync/integration account is additive and opt-in, never a prerequisite for local features.
+**No account wall:** Aistee itself must remain useful without an Aistee account, cloud sync or hosted backup. Provider logins/API keys are required only for the providers the user explicitly chooses. Local chats, projects, files, tools, settings, import/export and manual backup/restore stay available locally. Any future Aistee cloud/sync/integration account is additive and opt-in, never a prerequisite for local features.
 
 ## Near-term roadmap
 
 - [x] remove generated/build-machine files from version control
-- [x] normalize app name, namespace and application ID to LlmBench
+- [x] normalize app name, namespace and application ID to Aistee
 - [x] harden WebView security while preserving provider login compatibility
 - [x] migrate portable domain/provider logic to KMP `shared`
 - [x] add mobile WebView LRU/memory-pressure handling for long chats
@@ -128,7 +128,7 @@ Backends are optional, not the default. If a feature truly needs one, prefer a t
 - [x] show generating and unread response status on ChatGPT, Claude, Gemini, DeepSeek, Kimi and Vibe web tabs
 - [x] add Qwen, Microsoft Copilot, Z.ai, Grok, Character.AI, Venice and Meta AI account-backed WebView entries
 - [ ] verify embedded sign-in, embedded upload flows and provider-specific generation activity probes for Qwen, Copilot, Z.ai, Grok, Character.AI, Venice and Meta AI
-- [ ] add identity-assisted provider onboarding with a preferred Google/GitHub/Microsoft sign-in path, verified provider capabilities and browser-backed auth where needed, without a mandatory LlmBench account or cookie/token copying
+- [ ] add identity-assisted provider onboarding with a preferred Google/GitHub/Microsoft sign-in path, verified provider capabilities and browser-backed auth where needed, without a mandatory Aistee account or cookie/token copying
 - [x] add a local Markdown prompt vault with edit/import/export and chat-to-`.md` workflows
 - [x] add manually editable/importable `SKILL.md` assets with safe capability gating
 - [ ] bring Docbench's format validation/repair, EOL normalization, local tokenizer and hidden-text/prompt-smuggling inspector into prompt/file tooling

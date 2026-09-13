@@ -8,7 +8,7 @@ plugins {
 
 kotlin {
     android {
-        namespace = "com.twojstar.llmbench.shared"
+        namespace = "ais.tee.shared"
         compileSdk = 37
         minSdk = 26
         compilerOptions {

@@ -1,0 +1,156 @@
+package ais.tee.data.streambench
+
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import androidx.annotation.OptIn
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.okhttp.OkHttpDataSource
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.session.MediaSession
+import androidx.media3.session.MediaSessionService
+import ais.tee.MainActivity
+import okhttp3.OkHttpClient
+
+/** Private Media3 session for explicit Streambench playback started from Aistee UI. */
+@OptIn(UnstableApi::class)
+class StreambenchPlaybackService : MediaSessionService() {
+    private var player: ExoPlayer? = null
+    private var mediaSession: MediaSession? = null
+
+    override fun onCreate() {
+        super.onCreate()
+
+        val requestPolicy = StreambenchRemoteRequestInterceptor()
+        val streamClient = OkHttpClient.Builder()
+            .dns(StreambenchPublicDns())
+            .addInterceptor(requestPolicy)
+            .addNetworkInterceptor(requestPolicy)
+            .followRedirects(true)
+            .followSslRedirects(false)
+            .build()
+        val dataSourceFactory = OkHttpDataSource.Factory(streamClient)
+        val mediaSourceFactory = DefaultMediaSourceFactory(this)
+            .setDataSourceFactory(dataSourceFactory)
+
+        val createdPlayer = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .setAudioAttributes(AudioAttributes.DEFAULT, true)
+            .setHandleAudioBecomingNoisy(true)
+            .build()
+        createdPlayer.addListener(
+            object : Player.Listener {
+                override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                    StreambenchPlaybackState.setPlayWhenReady(playWhenReady)
+                }
+
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (playbackState == Player.STATE_ENDED) {
+                        finishPlayback()
+                    }
+                }
+
+                override fun onPlayerError(error: PlaybackException) {
+                    finishPlayback()
+                }
+            }
+        )
+        player = createdPlayer
+
+        val sessionActivity = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        mediaSession = MediaSession.Builder(this, createdPlayer)
+            .setSessionActivity(sessionActivity)
+            .build()
+    }
+
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val result = super.onStartCommand(intent, flags, startId)
+        when (intent?.action) {
+            ACTION_PLAY -> playFromIntent(intent)
+            ACTION_STOP -> finishPlayback()
+        }
+        return result
+    }
+
+    private fun playFromIntent(intent: Intent) {
+        val activePlayer = player ?: return
+        val rawUrl = intent.getStringExtra(EXTRA_URL) ?: return
+        val url = StreambenchM3uParser.validateRemotePlaybackUrl(rawUrl) ?: return
+        val title = intent.getStringExtra(EXTRA_TITLE).orEmpty().ifBlank { DEFAULT_TITLE }
+        val group = intent.getStringExtra(EXTRA_GROUP).orEmpty()
+
+        val metadataBuilder = MediaMetadata.Builder().setTitle(title)
+        if (group.isNotBlank()) {
+            metadataBuilder.setArtist(group)
+        }
+
+        val mediaItem = MediaItem.Builder()
+            .setUri(url)
+            .setMediaMetadata(metadataBuilder.build())
+            .build()
+        StreambenchPlaybackState.setMedia(
+            title = title,
+            group = group,
+            playWhenReady = activePlayer.playWhenReady
+        )
+        activePlayer.setMediaItem(mediaItem)
+        activePlayer.prepare()
+        activePlayer.play()
+    }
+
+    private fun finishPlayback() {
+        StreambenchPlaybackState.clear()
+        player?.stop()
+        stopSelf()
+    }
+
+    override fun onDestroy() {
+        StreambenchPlaybackState.clear()
+        mediaSession?.release()
+        mediaSession = null
+        player?.release()
+        player = null
+        super.onDestroy()
+    }
+
+    companion object {
+        private const val ACTION_PLAY = "ais.tee.streambench.PLAY"
+        private const val ACTION_STOP = "ais.tee.streambench.STOP"
+        private const val EXTRA_URL = "stream_url"
+        private const val EXTRA_TITLE = "stream_title"
+        private const val EXTRA_GROUP = "stream_group"
+        private const val DEFAULT_TITLE = "Streambench"
+
+        fun play(context: Context, request: StreambenchPlaybackRequest) {
+            context.startService(
+                Intent(context, StreambenchPlaybackService::class.java)
+                    .setAction(ACTION_PLAY)
+                    .putExtra(EXTRA_URL, request.url)
+                    .putExtra(EXTRA_TITLE, request.title)
+                    .putExtra(EXTRA_GROUP, request.group)
+            )
+        }
+
+        fun stop(context: Context) {
+            val serviceIntent = Intent(context, StreambenchPlaybackService::class.java)
+            if (StreambenchPlaybackState.state.value.active) {
+                context.startService(serviceIntent.setAction(ACTION_STOP))
+            } else {
+                context.stopService(serviceIntent)
+            }
+        }
+    }
+}

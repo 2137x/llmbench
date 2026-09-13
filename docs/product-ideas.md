@@ -1,12 +1,12 @@
 # Product ideas
 
-This is a durable backlog of product directions worth exploring in LlmBench.
+This is a durable backlog of product directions worth exploring in Aistee.
 The ideas are inspired by observed workflows in other AI/document apps and by tools already maintained in `travnie/twojstar`; they are not implementation copies.
 
 ## Markdown workspace / prompt vault
 
 - Treat local `.md` files as editable source-of-truth assets, not one-shot attachments.
-- Create, open, edit, save and Save As Markdown from inside LlmBench.
+- Create, open, edit, save and Save As Markdown from inside Aistee.
 - Keep recent/search/favorite or pinned prompt files for fast reuse.
 - Let one Markdown file act as a prompt, system instructions, reusable context or a skill definition.
 - Support Android document-picker access without silently replacing the selected file with a private app copy.
@@ -15,14 +15,14 @@ The ideas are inspired by observed workflows in other AI/document apps and by to
 
 ## Local-first ownership and optional cloud
 
-- LlmBench must have no account wall. First launch and normal local use must not require creating an LlmBench identity, accepting cloud storage or enabling sync.
-- Require authentication only where an external provider itself requires it. Signing into ChatGPT/Claude/etc. or adding an API key must not silently enroll the user in a separate LlmBench account.
-- Keep locally owned chats, projects, prompts, files, skills, built-in tools, settings and history usable without LlmBench-hosted infrastructure.
+- Aistee must have no account wall. First launch and normal local use must not require creating an Aistee identity, accepting cloud storage or enabling sync.
+- Require authentication only where an external provider itself requires it. Signing into ChatGPT/Claude/etc. or adding an API key must not silently enroll the user in a separate Aistee account.
+- Keep locally owned chats, projects, prompts, files, skills, built-in tools, settings and history usable without Aistee-hosted infrastructure.
 - Local export, backup and restore are first-class features, not fallback paths. Prefer ordinary portable files/archives with a documented manifest/version so users can keep copies wherever they choose.
 - Do not silently upload app data for safekeeping. Cloud sync, remote backup, cross-device restore and hosted integrations are explicit opt-ins with clear data scope and a way to turn them off again.
 - Do not degrade, delay or nag-gate local features because cloud backup is disabled. If a user chooses local-only storage and loses the device without making a backup, that is an accepted consequence of the choice rather than a reason to force account creation.
 - Any future cloud feature should synchronize local sources of truth rather than replace them. Signing out or discontinuing the service must leave the user's local data usable and exportable.
-- Avoid cloud-only proprietary formats. A user should be able to leave with their data without asking LlmBench for permission.
+- Avoid cloud-only proprietary formats. A user should be able to leave with their data without asking Aistee for permission.
 
 ## Chat import / export
 
@@ -63,7 +63,7 @@ The ideas are inspired by observed workflows in other AI/document apps and by to
 
 ## Prompt/file tooling borrowed from Docbench
 
-These are Docbench-style capabilities to bring into LlmBench, not changes to Docbench itself.
+These are Docbench-style capabilities to bring into Aistee, not changes to Docbench itself.
 
 - Validate the construction/structure of prompt and Markdown formats.
 - Offer safe repair/normalization when the structure is malformed.
@@ -73,10 +73,10 @@ These are Docbench-style capabilities to bring into LlmBench, not changes to Doc
 
 ## Built-in Bench tools / plugins
 
-- Treat useful capabilities from `travnie/twojstar` Benches as first-party LlmBench tools instead of requiring an external MCP or another service for capabilities LlmBench should provide locally.
+- Treat useful capabilities from `travnie/twojstar` Benches as first-party Aistee tools instead of requiring an external MCP or another service for capabilities Aistee should provide locally.
 - Keep a small capability registry so each built-in tool declares its inputs, outputs, permissions, local/network behavior and which chat/provider transports can use it.
 - Expose tools selectively per provider. Native/API chats can receive real tool calls where supported; account-backed WebViews should get only reliable, explicit user-approved bridges or one-tap insert/share flows rather than brittle page scraping.
-- Keep one source of truth for Bench logic. Prefer extracting/reusing portable cores or a narrow typed bridge over copying implementations into LlmBench and letting them diverge.
+- Keep one source of truth for Bench logic. Prefer extracting/reusing portable cores or a narrow typed bridge over copying implementations into Aistee and letting them diverge.
 - **Docbench tool:** document/Markdown/JSON/YAML/XML validation, repair and formatting; EOL/BOM handling; the real local tokenizer; safe previews; and selected PDF operations where they fit a chat workflow.
 - **Docbench Text Inspector:** reuse the existing inspector as the pre-flight view for imported/selected text before it is trusted by a model or tool. Surface exact line/column, severity and safely escaped/decoded payloads for zero-width and bidi controls, Unicode tags, variation-selector carriers, mixed-script confusables, prompt-injection-like instructions, Base64-encoded instructions and oversized encoded carriers. Detection warns and reveals; it does not silently execute, rewrite or discard the source.
 - **Codebench tool:** local QR/barcode generation and scanning/decoding, including making a code from selected/chat text and returning decoded content to the composer when useful.
@@ -90,14 +90,14 @@ Treat Token Arena as the overlap between Bench tooling and a small experimental 
 - Keep the bundled local `o200k_base` counter as the always-available Android reference baseline today. Keep the shared `TokenCounter` contract portable so other clients can add equivalent local backends later. Label every result by encoding and never present `o200k_base` as a universal token count for unrelated model families.
 - Add model/provider-specific counters only when they provide useful signal through an official count API or a lightweight, trustworthy tokenizer. Do not bundle a tokenizer zoo merely to make the comparison table look complete.
 - Distinguish measurement modes clearly: provider-exact count, local exact-for-encoding count, and reference/fallback estimate. Never blend them into one unlabeled number.
-- Compare token count and percentage delta alongside provider-reported input/output/cached/reasoning usage where available, plus cost, latency, response length and LlmBench quality scores.
+- Compare token count and percentage delta alongside provider-reported input/output/cached/reasoning usage where available, plus cost, latency, response length and Aistee quality scores.
 - Record response provenance for every Arena run, including live provider responses, cached/replayed data and local `isSimulated` fallbacks.
 - Exclude cached/replayed and simulated/fallback responses from live-provider efficiency rankings by default, or show them in clearly separate groups so they cannot win on replayed or synthetic latency/cost/quality data.
 - Derive efficiency views such as quality per 1k input tokens, quality per cost unit and whether extra prompt structure reduces output length, retries or failure rate.
 - Add a **Prompt Tournament** mode that keeps the intent fixed while testing representations such as concise vs verbose, plain text vs Markdown/JSON/YAML, or different natural languages across selected models.
 - Optimize for task success and clarity, not minimum token count alone. A slightly larger structured prompt may be the winner if it improves quality, lowers output cost or avoids another round trip.
 - Make experiments reproducible by recording the model/provider identity, counter backend/encoding, prompt variant and relevant pricing snapshot instead of comparing anonymous numbers that may drift over time.
-- Keep the Android local baseline fully usable offline and without an LlmBench account; future platform backends should preserve the same property. Network-backed provider counting is optional and must not silently upload text merely to obtain a more exact number.
+- Keep the Android local baseline fully usable offline and without an Aistee account; future platform backends should preserve the same property. Network-backed provider counting is optional and must not silently upload text merely to obtain a more exact number.
 - Use accumulated Arena results to reveal practical family/model tendencies without claiming that tokenization alone explains model reasoning or internal processing.
 
 ## UI/UX architecture and smoothness
@@ -131,7 +131,7 @@ Treat Token Arena as the overlap between Bench tooling and a small experimental 
 - Persist locally owned native/API conversations with stable conversation IDs before exposing message widgets or conversation notifications. The current native chat history lives in ViewModel state and is not durable enough to back a widget across process death/reboot.
 - Offer three configurable widget modes: **Chats** (recent/favorite conversations or provider shortcuts), **Messages** (latest locally known messages across chats), and **Pinned chat** (latest messages/status for one chosen conversation with a direct deep-link back into it).
 - Back collection widgets with `LazyColumn` and stable item IDs so list state survives updates where the platform supports it; resize by showing more or fewer rows rather than scaling text into mush.
-- Treat WebView account providers honestly: if LlmBench does not own their conversation history, the widget may expose provider/chat shortcuts and locally tracked status, but must not periodically scrape remote pages just to manufacture a message list.
+- Treat WebView account providers honestly: if Aistee does not own their conversation history, the widget may expose provider/chat shortcuts and locally tracked status, but must not periodically scrape remote pages just to manufacture a message list.
 - Make widget rows deep-link directly to the corresponding local conversation/provider. Do not use background activity-launch trampolines.
 - Add privacy controls for widget/notification previews: allow hiding message bodies, model/provider details or all sensitive text while keeping a useful title/status.
 - For locally owned native/API chats, publish proper conversation notifications with `MessagingStyle`, `Person` metadata and long-lived conversation shortcuts so Android can surface them consistently in conversation UI and system widgets.
@@ -143,24 +143,24 @@ Treat Token Arena as the overlap between Bench tooling and a small experimental 
 
 ## Identity-assisted provider onboarding
 
-- Do not introduce a mandatory LlmBench account just to reduce provider login friction. Treat this as provider onboarding, not as a new identity silo.
-- Let the user choose a preferred sign-in method such as Google, GitHub or Microsoft, then select which compatible providers to connect. Store the preference locally; do not require LlmBench to own the upstream identity.
+- Do not introduce a mandatory Aistee account just to reduce provider login friction. Treat this as provider onboarding, not as a new identity silo.
+- Let the user choose a preferred sign-in method such as Google, GitHub or Microsoft, then select which compatible providers to connect. Store the preference locally; do not require Aistee to own the upstream identity.
 - Extend the provider capability registry with supported social sign-in methods and an authentication surface/handoff mode so the UI only offers combinations verified for that provider.
 - Launch third-party identity-provider steps in Android Auth Tab / Custom Tabs where supported. These use the user's browser-backed session, so an already signed-in Google/GitHub/Microsoft account can often turn repeated credential entry into a short provider-specific confirmation flow.
-- Keep every provider authorization independent. One Google/GitHub/Microsoft login is not a universal token for unrelated relying parties, and LlmBench must never claim otherwise.
+- Keep every provider authorization independent. One Google/GitHub/Microsoft login is not a universal token for unrelated relying parties, and Aistee must never claim otherwise.
 - Never copy browser cookies into WebView, extract OAuth tokens from provider pages, inject credentials, or automate hidden sign-in. Provider and identity-provider sessions remain owned by their respective origins.
 - Track session handoff explicitly per provider: embedded session supported, browser-backed only, or manual/unsupported. If a provider cannot safely return an authenticated session to the integrated WebView, keep it browser-backed or require manual sign-in instead of bridging cookie stores.
 - A browser-backed provider may lose WebView-only tweaks, activity probes or composer bridges; surface that tradeoff in the capability UI rather than silently degrading features.
-- Better Auth is only a future option if LlmBench later needs its own optional account or wants to link several identities to LlmBench-owned cloud/sync features. It is not required for this provider-login flow and cannot mint sessions for unrelated AI providers.
+- Better Auth is only a future option if Aistee later needs its own optional account or wants to link several identities to Aistee-owned cloud/sync features. It is not required for this provider-login flow and cannot mint sessions for unrelated AI providers.
 - Re-check provider login surfaces and Android authentication guidance at implementation time; both provider OAuth behavior and browser/WebView constraints can change independently of the app.
 ## Security and privacy architecture
 
 - Treat security as a release requirement for every feature that touches accounts, prompts, messages, files, tools, widgets or notifications; do threat modeling before wiring new cross-boundary data flows.
-- Minimize sensitive state. Keep data local when practical, collect only what a feature needs, and make provider-owned login/session material stay provider-owned rather than copying cookies, OAuth tokens or passwords into LlmBench storage.
+- Minimize sensitive state. Keep data local when practical, collect only what a feature needs, and make provider-owned login/session material stay provider-owned rather than copying cookies, OAuth tokens or passwords into Aistee storage.
 - Keep native API secrets behind the existing Android Keystore-backed AES-GCM store. Never write raw keys, credentials, auth headers, prompts or message bodies to logs, analytics, crash breadcrumbs, exports or diagnostics.
 - Define explicit backup/transfer rules before durable chat storage ships. The current manifest allows backup; secrets, WebView/session state, private conversations and sensitive attachments must be excluded by default, with only deliberately safe settings opted into backup or device transfer.
 - Classify local data by sensitivity and use separate stores for public preferences, private conversation content, imported files and secrets so retention, backup and deletion rules can be enforced independently.
-- Give users clear delete controls for individual chats/projects/files and a secure "clear local data/sign out providers" path that removes LlmBench-owned sensitive state without pretending it can revoke provider-side data.
+- Give users clear delete controls for individual chats/projects/files and a secure "clear local data/sign out providers" path that removes Aistee-owned sensitive state without pretending it can revoke provider-side data.
 - Keep WebViews least-privileged: HTTPS-only provider boundaries, no mixed content, file/content access disabled unless a scoped user action requires it, no arbitrary remote userscripts, and no JavaScript-to-native interface for untrusted provider pages. Preserve the existing provider/document guards around injected static scripts.
 - Treat every imported `SKILL.md`, document, generated artifact and decoded QR/barcode as untrusted data. Parsing or previewing it must never execute scripts or silently grant file/network/secret access.
 - Run the Docbench Text Inspector as a reusable security pre-flight wherever untrusted text can cross into model context, skill instructions, tool input or a share/import flow. Make hidden carriers visible to the user before trust decisions instead of relying only on prompt-injection heuristics.
@@ -180,7 +180,7 @@ Treat Token Arena as the overlap between Bench tooling and a small experimental 
 - Quick actions: new prompt/note, open recent asset, search library and use in chat should stay close at hand.
 - Skill management: create, edit, try, import, export and enable/disable from one obvious place.
 - Project context: chats + files + instructions belong together when the user chooses to group them.
-- Local-first editing: portable files remain understandable and editable outside LlmBench.
+- Local-first editing: portable files remain understandable and editable outside Aistee.
 
 ## Research notes from the APK batch
 
@@ -192,5 +192,5 @@ Treat Token Arena as the overlap between Bench tooling and a small experimental 
 - Kimi: project libraries, project instructions, reusable skills, skill create/edit/download, document-to-skill workflows and direct Save as Markdown export.
 - Perplexity: library/projects/artifacts separation, pinning and Markdown open-externally behavior.
 - Grok: editable files, agent instructions and export-oriented artifact workflows.
-- DeepSeek: useful attachment validation/error UX, but attachment-only storage is not the target architecture for LlmBench.
+- DeepSeek: useful attachment validation/error UX, but attachment-only storage is not the target architecture for Aistee.
 - Meta AI: artifact/library/preset concepts reinforce keeping generated assets reusable outside one chat.
