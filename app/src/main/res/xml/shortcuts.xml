@@ -1,5 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <capability android:name="actions.intent.CREATE_MESSAGE">
+        <intent
+            android:action="com.twojstar.llmbench.action.CREATE_MESSAGE"
+            android:targetPackage="com.twojstar.llmbench"
+            android:targetClass="com.twojstar.llmbench.MainActivity">
+            <parameter
+                android:name="message.text"
+                android:key="text"
+                android:required="true" />
+        </intent>
+    </capability>
     <shortcut
         android:shortcutId="web_ai"
         android:enabled="true"
