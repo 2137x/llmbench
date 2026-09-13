@@ -1,8 +1,8 @@
 package com.twojstar.llmbench
 
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
+import com.twojstar.llmbench.navigation.LlmBenchQuickActionNavigation
 import com.twojstar.llmbench.ui.viewmodel.NavigationTab
-import com.twojstar.llmbench.widget.LlmBenchWidgetNavigation
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -50,19 +50,46 @@ class PrimaryNavigationTest {
     }
 
     @Test
-    fun widgetDestinationsMapToPrimaryTabs() {
+    fun quickActionRoutingAcceptsCurrentAndLegacyActions() {
+        assertTrue(
+            LlmBenchQuickActionNavigation.isOpenDestinationAction(
+                LlmBenchQuickActionNavigation.ACTION_OPEN_DESTINATION
+            )
+        )
+        assertTrue(
+            LlmBenchQuickActionNavigation.isOpenDestinationAction(
+                LlmBenchQuickActionNavigation.LEGACY_WIDGET_ACTION_OPEN_DESTINATION
+            )
+        )
+        assertFalse(LlmBenchQuickActionNavigation.isOpenDestinationAction("not-a-quick-action"))
+    }
+
+    @Test
+    fun quickActionDestinationIdFallsBackToIntentData() {
+        assertEquals(
+            LlmBenchQuickActionNavigation.DESTINATION_COMPARE,
+            LlmBenchQuickActionNavigation.destinationId(
+                currentExtra = null,
+                legacyExtra = null,
+                dataLastPathSegment = LlmBenchQuickActionNavigation.DESTINATION_COMPARE,
+            )
+        )
+    }
+
+    @Test
+    fun quickActionDestinationsMapToPrimaryTabs() {
         assertEquals(
             NavigationTab.WEB_CHATS,
-            LlmBenchWidgetNavigation.destination(LlmBenchWidgetNavigation.DESTINATION_WEB_AI)
+            LlmBenchQuickActionNavigation.destination(LlmBenchQuickActionNavigation.DESTINATION_WEB_AI)
         )
         assertEquals(
             NavigationTab.COMPARE_HUB,
-            LlmBenchWidgetNavigation.destination(LlmBenchWidgetNavigation.DESTINATION_COMPARE)
+            LlmBenchQuickActionNavigation.destination(LlmBenchQuickActionNavigation.DESTINATION_COMPARE)
         )
         assertEquals(
             NavigationTab.STUDIO,
-            LlmBenchWidgetNavigation.destination(LlmBenchWidgetNavigation.DESTINATION_STUDIO)
+            LlmBenchQuickActionNavigation.destination(LlmBenchQuickActionNavigation.DESTINATION_STUDIO)
         )
-        assertNull(LlmBenchWidgetNavigation.destination("unknown"))
+        assertNull(LlmBenchQuickActionNavigation.destination("unknown"))
     }
 }

@@ -34,6 +34,7 @@ import com.twojstar.llmbench.data.model.WebAiService
 import com.twojstar.llmbench.data.model.webChatSections
 import com.twojstar.llmbench.data.security.TextInspectionResult
 import com.twojstar.llmbench.data.security.TextInspector
+import com.twojstar.llmbench.navigation.LlmBenchQuickActionNavigation
 import com.twojstar.llmbench.share.IncomingSharePayload
 import com.twojstar.llmbench.share.PendingWebShare
 import com.twojstar.llmbench.share.canOpenInMarkdownWorkspace
@@ -47,7 +48,6 @@ import com.twojstar.llmbench.ui.viewmodel.MarkdownWorkspaceViewModel
 import com.twojstar.llmbench.ui.viewmodel.NavigationTab
 import com.twojstar.llmbench.ui.viewmodel.StudioUiState
 import com.twojstar.llmbench.ui.viewmodel.StudioViewModel
-import com.twojstar.llmbench.widget.LlmBenchWidgetNavigation
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -134,7 +134,7 @@ class MainActivity : ComponentActivity() {
         markdownWorkspaceViewModel.attachLifecycle(this)
         retainedShareIntentHandled = savedInstanceState?.getBoolean(KEY_SHARE_INTENT_HANDLED) == true
         restoreShareState(savedInstanceState)
-        handleWidgetNavigationIntent(intent)
+        handleQuickActionNavigationIntent(intent)
         if (!retainedShareIntentHandled) handleIncomingShareIntent(intent)
 
         setContent {
@@ -220,7 +220,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         retainedShareIntentHandled = false
         setIntent(intent)
-        handleWidgetNavigationIntent(intent)
+        handleQuickActionNavigationIntent(intent)
         handleIncomingShareIntent(intent)
     }
 
@@ -230,14 +230,18 @@ class MainActivity : ComponentActivity() {
         saveShareState(outState)
     }
 
-    private fun handleWidgetNavigationIntent(intent: Intent) {
-        if (intent.action != LlmBenchWidgetNavigation.ACTION_OPEN_DESTINATION) return
-        LlmBenchWidgetNavigation.destination(
-            intent.getStringExtra(LlmBenchWidgetNavigation.EXTRA_DESTINATION)
-        )?.let(viewModel::selectTab)
+    private fun handleQuickActionNavigationIntent(intent: Intent) {
+        if (!LlmBenchQuickActionNavigation.isOpenDestinationAction(intent.action)) return
+        val destinationId = LlmBenchQuickActionNavigation.destinationId(
+            currentExtra = intent.getStringExtra(LlmBenchQuickActionNavigation.EXTRA_DESTINATION),
+            legacyExtra = intent.getStringExtra(LlmBenchQuickActionNavigation.LEGACY_WIDGET_EXTRA_DESTINATION),
+            dataLastPathSegment = intent.data?.lastPathSegment,
+        )
+        LlmBenchQuickActionNavigation.destination(destinationId)?.let(viewModel::selectTab)
         intent.action = Intent.ACTION_MAIN
         intent.data = null
-        intent.removeExtra(LlmBenchWidgetNavigation.EXTRA_DESTINATION)
+        intent.removeExtra(LlmBenchQuickActionNavigation.EXTRA_DESTINATION)
+        intent.removeExtra(LlmBenchQuickActionNavigation.LEGACY_WIDGET_EXTRA_DESTINATION)
     }
 
     private fun handleIncomingShareIntent(intent: Intent) {
