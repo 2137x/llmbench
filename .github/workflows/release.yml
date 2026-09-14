@@ -240,10 +240,10 @@ jobs:
               gh api --method DELETE "repos/$GH_REPO/releases/$release_id" >/dev/null 2>&1 || true
             fi
             gh api --method DELETE "repos/$GH_REPO/git/refs/tags/$stage" >/dev/null 2>&1 || true
-            if [ "$tag_restored" = true ] && [ "$release_restored" = true ]; then
-              gh api --method DELETE "repos/$GH_REPO/git/refs/tags/$backup" >/dev/null 2>&1 || true
-            elif [ "$old_moved" = true ]; then
-              echo "::warning::Recovery backup kept as $backup for manual repair."
+            if [ "$tag_restored" != true ] || [ "$release_restored" != true ]; then
+              if [ "$old_moved" = true ]; then
+                echo "::warning::Recovery release kept as $backup for manual repair."
+              fi
             fi
 
             exit "$status"
@@ -274,8 +274,6 @@ jobs:
               exit 1
             fi
 
-            gh api --method POST "repos/$GH_REPO/git/refs" \
-              -f ref="refs/tags/$backup" -f sha="$old_ref_sha" >/dev/null
             gh api --method PATCH "repos/$GH_REPO/releases/$old_id" \
               -f tag_name="$backup" -f make_latest=false >/dev/null
             old_moved=true
@@ -313,9 +311,7 @@ jobs:
 
           gh api --method DELETE "repos/$GH_REPO/git/refs/tags/$stage" >/dev/null 2>&1 || true
           if [ "$old_moved" = true ]; then
-            if gh api --method DELETE "repos/$GH_REPO/releases/$old_id" >/dev/null 2>&1; then
-              gh api --method DELETE "repos/$GH_REPO/git/refs/tags/$backup" >/dev/null 2>&1 || true
-            else
+            if ! gh api --method DELETE "repos/$GH_REPO/releases/$old_id" >/dev/null 2>&1; then
               echo "::warning::Previous rolling release kept as $backup because cleanup failed."
             fi
           fi
