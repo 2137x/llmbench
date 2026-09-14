@@ -286,12 +286,27 @@ jobs:
             -f name='Aistee · rolling' -F draft=false -F prerelease=false \
             -f make_latest=true >/dev/null
 
-          if gh api "repos/$GH_REPO/git/ref/tags/$tag" >/dev/null 2>&1; then
-            gh api --method PATCH "repos/$GH_REPO/git/refs/tags/$tag" \
-              -f sha="$GITHUB_SHA" -F force=true >/dev/null
-          else
-            gh api --method POST "repos/$GH_REPO/git/refs" \
-              -f ref="refs/tags/$tag" -f sha="$GITHUB_SHA" >/dev/null
+          tag_synced=false
+          deadline=$((SECONDS + 60))
+          last_error=""
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            if last_error="$(gh api --method PATCH "repos/$GH_REPO/git/refs/tags/$tag" \
+              -f sha="$GITHUB_SHA" -F force=true 2>&1 >/dev/null)"; then
+              tag_synced=true
+              break
+            fi
+
+            if ! printf '%s\n' "$last_error" | grep -Eq '\(HTTP (404|408|429|5[0-9]{2})\)'; then
+              echo "::error::Could not synchronize the promoted release tag."
+              printf '%s\n' "$last_error" >&2
+              exit 1
+            fi
+            sleep 5
+          done
+          if [ "$tag_synced" != true ]; then
+            echo "::error::Promoted release tag did not become available within 60 seconds."
+            printf '%s\n' "$last_error" >&2
+            exit 1
           fi
           promoted=true
           trap - EXIT
