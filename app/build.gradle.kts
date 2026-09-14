@@ -11,6 +11,17 @@ val releaseStorePassword = System.getenv("AISTEE_KEYSTORE_PASSWORD")?.takeIf { i
 val releaseKeyAlias = System.getenv("AISTEE_KEY_ALIAS")?.takeIf { it.isNotBlank() }
 val releaseKeyPassword = System.getenv("AISTEE_KEY_PASSWORD")?.takeIf { it.isNotBlank() }
 val releaseSigningValues = listOf(releaseStorePassword, releaseKeyAlias, releaseKeyPassword)
+val releaseVersionCode = System.getenv("AISTEE_VERSION_CODE")?.let { raw ->
+    if (raw.isBlank()) {
+        error("AISTEE_VERSION_CODE must not be blank")
+    }
+    val parsed = raw.toLongOrNull()
+        ?: error("AISTEE_VERSION_CODE must be an integer between 1 and 2100000000")
+    if (parsed !in 1..2_100_000_000L) {
+        error("AISTEE_VERSION_CODE must be an integer between 1 and 2100000000")
+    }
+    parsed.toInt()
+}
 if (releaseKeystorePath != null && releaseSigningValues.any { it == null }) {
     error("AISTEE_KEYSTORE requires non-blank signing password and alias environment variables")
 }
@@ -23,7 +34,7 @@ android {
         applicationId = "ais.tee"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
+        versionCode = releaseVersionCode ?: 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

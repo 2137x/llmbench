@@ -41,7 +41,13 @@ jobs:
             echo "::error::app/build.gradle.kts has no versionName."
             exit 1
           fi
+          version_code="$GITHUB_RUN_NUMBER"
+          if [ "$version_code" -lt 1 ] || [ "$version_code" -gt 2100000000 ]; then
+            echo "::error::GITHUB_RUN_NUMBER is outside the Google Play versionCode range."
+            exit 1
+          fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
 
       - name: Set up JDK 21
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
@@ -106,12 +112,14 @@ jobs:
           AISTEE_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           AISTEE_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           AISTEE_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          AISTEE_VERSION_CODE: ${{ steps.release.outputs.version_code }}
         run: ./gradlew :app:testDebugUnitTest :app:lintDebug :shared:desktopTest :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace
 
       - name: Verify and name release artifacts
         shell: bash
         env:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_VERSION_CODE: ${{ steps.release.outputs.version_code }}
         run: |
           set -euo pipefail
           mkdir -p dist
@@ -122,7 +130,9 @@ jobs:
 
           build_tools="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
           "$build_tools/apksigner" verify --verbose "$apk"
-          "$build_tools/aapt2" dump badging "$apk" | grep -F "versionName='$RELEASE_VERSION'"
+          badging="$("$build_tools/aapt2" dump badging "$apk")"
+          grep -F "versionName='$RELEASE_VERSION'" <<< "$badging"
+          grep -F "versionCode='$RELEASE_VERSION_CODE'" <<< "$badging"
           aab_files="$RUNNER_TEMP/aab-files.txt"
           unzip -Z1 "$aab" > "$aab_files"
           grep -Eq '^META-INF/.*\.(RSA|DSA|EC)$' "$aab_files"
