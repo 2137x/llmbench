@@ -43,22 +43,22 @@ class NativeChatWriterTest {
     }
 
     @Test
-    fun failedSaveIsRetried() {
+    fun latestArchiveKeepsRetryingAfterInitialFailures() {
         val attempts = AtomicInteger(0)
         val saved = CountDownLatch(1)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val writer = NativeChatWriter.createForTest(
             save = {
                 val attempt = attempts.incrementAndGet()
-                if (attempt >= 2) saved.countDown()
-                attempt >= 2
+                if (attempt >= 5) saved.countDown()
+                attempt >= 5
             },
             scope = scope
         )
         try {
             writer.enqueue(NativeChatArchive(activeConversationId = "c1"))
             assertTrue(saved.await(2, TimeUnit.SECONDS))
-            assertEquals(2, attempts.get())
+            assertEquals(5, attempts.get())
         } finally {
             scope.cancel()
         }

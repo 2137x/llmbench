@@ -59,10 +59,11 @@ internal class NativeChatWriter private constructor(
     init {
         scope.launch {
             for (archive in archives) {
-                var attempt = 0
-                while (!save(archive) && attempt < MAX_SAVE_RETRIES) {
-                    attempt += 1
-                    delay(RETRY_DELAY_MS * attempt)
+                var retryDelayMs = RETRY_DELAY_MS
+                while (latestArchive.get() == archive) {
+                    if (save(archive)) break
+                    delay(retryDelayMs)
+                    retryDelayMs = minOf(retryDelayMs * 2, MAX_RETRY_DELAY_MS)
                 }
             }
         }
@@ -98,7 +99,7 @@ internal class NativeChatWriter private constructor(
             instance = writer
         }
 
-        private const val MAX_SAVE_RETRIES = 2
         private const val RETRY_DELAY_MS = 50L
+        private const val MAX_RETRY_DELAY_MS = 5_000L
     }
 }
