@@ -679,7 +679,7 @@ fun ChatScreen(
                             openMarkdownAsset(
                                 asset = PendingMarkdownAsset(
                                     text = response.text,
-                                    displayName = "llmbench-${(response.provider ?: AiProvider.GEMINI).id}-response.md",
+                                    displayName = "aistee-${(response.provider ?: AiProvider.GEMINI).id}-response.md",
                                     sourceDescription = "this AI response"
                                 ),
                                 allowDiscardDirty = false

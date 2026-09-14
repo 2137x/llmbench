@@ -1,4 +1,4 @@
-<a href="https://deepwiki.com/travnie/llmbench"><img src="https://deepwiki.com/badge.svg" alt="DeepWiki"></a> <a href="https://doi.org/10.5281/zenodo.22307997"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.22307997.svg" alt="DOI"></a>
+<a href="https://deepwiki.com/travnie/aistee"><img src="https://deepwiki.com/badge.svg" alt="DeepWiki"></a> <a href="https://doi.org/10.5281/zenodo.22307997"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.22307997.svg" alt="DOI"></a>
 
 # Aistee
 
@@ -6,7 +6,7 @@ Kotlin Multiplatform workspace for using multiple AI services from one client wi
 
 > Status: early prototype. Android is the first client; shared domain/provider logic is moving to Kotlin Multiplatform so desktop and iOS clients can reuse the same core.
 
-Rolling Android build: [download the signed APK](https://github.com/travnie/llmbench/releases/download/aistee-latest/aistee.apk). The asset is replaced after each successful release build from `main`.
+Rolling Android build: [download the signed APK](https://github.com/travnie/aistee/releases/download/aistee-latest/aistee.apk). The asset is replaced after each successful release build from `main`.
 
 ## What it is
 
@@ -85,7 +85,7 @@ trvny/.ai             reusable profiles / instructions / skills
       └── optional consumption
               │
               ▼
-travnie/llmbench      shared KMP core + platform clients
+travnie/aistee        shared KMP core + platform clients
 ```
 
 Do not vendor a second copy of `.ai` here. If runtime integration becomes useful, consume a pinned/exported representation with an explicit boundary.
