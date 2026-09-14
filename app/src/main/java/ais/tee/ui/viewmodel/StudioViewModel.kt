@@ -9,6 +9,8 @@ import ais.tee.data.engine.ProfileMerger
 import ais.tee.data.engine.ValidationResult
 import ais.tee.data.engine.YamlParser
 import ais.tee.data.model.*
+import ais.tee.data.preferences.NativeChatStore
+import ais.tee.data.preferences.NativeChatWriter
 import ais.tee.data.preferences.StudioStateStore
 import ais.tee.data.preferences.StudioStateWriter
 import ais.tee.data.preferences.WebChatPreferencesStore
@@ -20,6 +22,7 @@ import ais.tee.share.PendingWebShare
 import ais.tee.share.claimText
 import ais.tee.share.completeTextClaim
 import ais.tee.share.releaseTextClaim
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Job
@@ -29,6 +32,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.IOException
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 
 data class ChatMessage(
@@ -37,6 +41,17 @@ data class ChatMessage(
     val text: String,
     val timestamp: Long = System.currentTimeMillis(),
     val notes: List<String> = emptyList()
+)
+
+private data class NativeChatSendPlan(
+    val targetProvider: AiProvider,
+    val providersToRun: List<AiProvider>,
+    val apiKeys: ApiKeyConfig
+)
+
+private data class NativeChatPromptContext(
+    val systemPrompt: String?,
+    val activeProfile: Profile?
 )
 
 data class StudioUiState(
@@ -59,17 +74,26 @@ data class StudioUiState(
     val pendingWebShare: PendingWebShare? = null,
 
     // Integrated Multi-Provider AI Chat
-    val chatMessages: List<ModelChatMessage> = emptyList(),
-    val selectedChatProvider: AiProvider = AiProvider.ALL,
-    val selectedChatModel: String = "all",
+    val nativeChat: NativeChatArchive = NativeChatArchive(),
+    val isNativeConversationStoreReady: Boolean = false,
     val apiKeyConfig: ApiKeyConfig = ApiKeyConfig(),
-    val includeSystemProfileInChat: Boolean = true,
     val isChatGenerating: Boolean = false,
     val activeGeneratingProviders: Set<AiProvider> = emptySet(),
     val showApiKeyDialog: Boolean = false,
     val gatewayModelOptions: Map<AiProvider, List<String>> = emptyMap(),
     val refreshingGatewayCatalogs: Set<AiProvider> = emptySet()
-)
+) {
+    val activeNativeConversation: NativeChatConversation?
+        get() = nativeChat.activeConversation
+    val chatMessages: List<ModelChatMessage>
+        get() = activeNativeConversation?.messages.orEmpty()
+    val selectedChatProvider: AiProvider
+        get() = activeNativeConversation?.selectedProvider ?: AiProvider.ALL
+    val selectedChatModel: String
+        get() = activeNativeConversation?.selectedModel ?: "all"
+    val includeSystemProfileInChat: Boolean
+        get() = activeNativeConversation?.includeSystemProfile ?: true
+}
 
 enum class NavigationTab {
     WEB_CHATS,
@@ -92,6 +116,8 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
     private val apiKeyStore = ApiKeyStore(application.applicationContext)
     private val studioStateStore = StudioStateStore(application.applicationContext)
     private val webChatPreferencesStore = WebChatPreferencesStore(application.applicationContext)
+    private val nativeChatStore = NativeChatStore(application.noBackupFilesDir)
+    private val nativeChatWriter = NativeChatWriter.getInstance(nativeChatStore)
     private val localSkillStore = LocalSkillLibraryStore(
         File(application.noBackupFilesDir, LocalSkillLibraryStore.LIBRARY_DIRECTORY_NAME)
     )
@@ -129,7 +155,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
             else -> recompute()
         }
         initPlaygroundWelcome()
-        initChatWelcome()
+        initNativeChatPersistence()
         startStudioPersistence(useFallbackPersistence)
     }
 
@@ -150,21 +176,63 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.update { it.copy(playgroundMessages = listOf(welcomeMsg)) }
     }
 
-    private fun initChatWelcome() {
+    private fun welcomeChatMessages(): List<ModelChatMessage> {
         val providerLines = AiProvider.concreteProviders.joinToString("\n") { provider ->
             "• **${provider.displayName}** (`${provider.defaultModel}`)"
         }
-        val welcomeChatMessages = listOf(
+        return listOf(
             ModelChatMessage(
                 id = "welcome_assistant_intro",
-                sender = "assistant",
+                sender = CHAT_ROLE_ASSISTANT,
                 provider = AiProvider.ALL,
                 modelName = "Multi-Model Hub",
-                text = "Welcome to the **AI Chat Hub**! 🚀\n\nHere you can interact with:\n$providerLines\n\n✨ **Compare Mode**: Select *'All Models'* to send your prompt to every configured direct provider concurrently and compare their outputs side-by-side.\n\n⚙️ Tap the **Key icon** in the top bar to connect your live API keys or test anytime in live simulation mode.",
+                text = "Welcome to the **AI Chat Hub**! 🚀\n\nHere you can interact with:\n$providerLines\n\n✨ **Compare Mode**: Select *'All Models'* to send your prompt to every configured direct provider concurrently and compare their outputs side-by-side.\n\n⚙️ Tap the **Key icon** in the top bar to connect your live API keys.",
                 activeProfileNotes = listOf("Active System Profile linked from Studio")
             )
         )
-        _uiState.update { it.copy(chatMessages = welcomeChatMessages) }
+    }
+
+    private fun createNativeConversation(
+        template: NativeChatConversation? = null,
+        now: Long = System.currentTimeMillis()
+    ): NativeChatConversation = NativeChatConversation(
+        id = UUID.randomUUID().toString(),
+        createdAtEpochMs = now,
+        updatedAtEpochMs = now,
+        messages = welcomeChatMessages(),
+        selectedProvider = template?.selectedProvider ?: AiProvider.ALL,
+        selectedModel = template?.selectedModel ?: "all",
+        includeSystemProfile = template?.includeSystemProfile ?: true
+    )
+
+    private fun initialNativeChatArchive(): NativeChatArchive {
+        val conversation = createNativeConversation()
+        return NativeChatArchive(
+            activeConversationId = conversation.id,
+            conversations = listOf(conversation)
+        )
+    }
+
+    private fun initNativeChatPersistence() {
+        val initial = initialNativeChatArchive()
+        _uiState.update { it.copy(nativeChat = initial) }
+        val cached = NativeChatWriter.currentArchive()?.normalized()
+        if (cached != null && cached.conversations.isNotEmpty()) {
+            _uiState.update {
+                it.copy(nativeChat = cached, isNativeConversationStoreReady = true)
+            }
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            val restored = nativeChatStore.load()
+                ?.normalized()
+                ?.takeIf { it.conversations.isNotEmpty() }
+                ?: initial
+            _uiState.update {
+                it.copy(nativeChat = restored, isNativeConversationStoreReady = true)
+            }
+            nativeChatWriter.enqueue(restored)
+        }
     }
 
     fun selectTab(tab: NavigationTab) {
@@ -338,8 +406,73 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
 
     // --- Chat Screen Actions ---
 
+    private fun persistNativeChat() {
+        val state = _uiState.value
+        if (state.isNativeConversationStoreReady) {
+            nativeChatWriter.enqueue(state.nativeChat)
+        }
+    }
+
+    private fun updateActiveNativeConversation(
+        persist: Boolean = true,
+        transform: (NativeChatConversation) -> NativeChatConversation
+    ) {
+        _uiState.update { state ->
+            state.copy(nativeChat = state.nativeChat.updateActiveConversation(transform))
+        }
+        if (persist) persistNativeChat()
+    }
+
+    fun newNativeConversation() {
+        if (!_uiState.value.isNativeConversationStoreReady) return
+        cancelChatGeneration()
+        val template = _uiState.value.activeNativeConversation
+        val conversation = createNativeConversation(template)
+        _uiState.update { state ->
+            state.copy(
+                nativeChat = state.nativeChat.copy(
+                    activeConversationId = conversation.id,
+                    conversations = listOf(conversation) + state.nativeChat.conversations
+                )
+            )
+        }
+        persistNativeChat()
+    }
+
+    fun switchNativeConversation(conversationId: String) {
+        val state = _uiState.value
+        if (!state.isNativeConversationStoreReady || state.nativeChat.activeConversationId == conversationId) return
+        if (state.nativeChat.conversations.none { it.id == conversationId }) return
+        cancelChatGeneration()
+        _uiState.update { current ->
+            current.copy(nativeChat = current.nativeChat.copy(activeConversationId = conversationId))
+        }
+        persistNativeChat()
+    }
+
+    fun deleteNativeConversation(conversationId: String) {
+        val state = _uiState.value
+        if (!state.isNativeConversationStoreReady) return
+        if (state.nativeChat.activeConversationId == conversationId) cancelChatGeneration()
+        _uiState.update { current ->
+            val retained = current.nativeChat.conversations.filterNot { it.id == conversationId }
+            val conversations = retained.ifEmpty { listOf(createNativeConversation()) }
+            val activeId = current.nativeChat.activeConversationId
+                .takeIf { id -> conversations.any { it.id == id } }
+                ?: conversations.maxByOrNull { it.updatedAtEpochMs }?.id.orEmpty()
+            current.copy(
+                nativeChat = current.nativeChat.copy(
+                    activeConversationId = activeId,
+                    conversations = conversations
+                )
+            )
+        }
+        persistNativeChat()
+    }
+
     fun setChatProvider(provider: AiProvider) {
         val state = _uiState.value
+        if (!state.isNativeConversationStoreReady) return
         val knownModels = state.gatewayModelOptions[provider] ?: provider.availableModels
         val newModel = when {
             provider == AiProvider.ALL -> "all"
@@ -347,17 +480,15 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
             knownModels.isNotEmpty() -> knownModels.first()
             else -> ""
         }
-        _uiState.update {
-            it.copy(
-                selectedChatProvider = provider,
-                selectedChatModel = newModel
-            )
+        updateActiveNativeConversation { conversation ->
+            conversation.copy(selectedProvider = provider, selectedModel = newModel)
         }
         if (provider.usesLiveFreeModelCatalog()) refreshGatewayModelCatalog(provider)
     }
 
     fun setChatModel(modelName: String) {
-        _uiState.update { it.copy(selectedChatModel = modelName) }
+        if (!_uiState.value.isNativeConversationStoreReady) return
+        updateActiveNativeConversation { it.copy(selectedModel = modelName) }
     }
 
     fun refreshGatewayModelCatalog(provider: AiProvider) {
@@ -385,11 +516,19 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                     } else {
                         current.selectedChatModel
                     }
+                    val nativeChat = if (current.selectedChatProvider == provider) {
+                        current.nativeChat.updateActiveConversation { conversation ->
+                            conversation.copy(selectedModel = selectedModel)
+                        }
+                    } else {
+                        current.nativeChat
+                    }
                     current.copy(
                         gatewayModelOptions = current.gatewayModelOptions + (provider to models),
-                        selectedChatModel = selectedModel
+                        nativeChat = nativeChat
                     )
                 }
+                persistNativeChat()
                 if (models.isEmpty()) {
                     showSnackbar("No free text models are currently available for ${provider.shortName}.")
                 }
@@ -408,7 +547,8 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun toggleIncludeSystemProfile(include: Boolean) {
-        _uiState.update { it.copy(includeSystemProfileInChat = include) }
+        if (!_uiState.value.isNativeConversationStoreReady) return
+        updateActiveNativeConversation { it.copy(includeSystemProfile = include) }
         showSnackbar(if (include) "System profile prompt attached to chat" else "Standard base model prompt mode")
     }
 
@@ -449,9 +589,17 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun clearChatHistory() {
+        if (!_uiState.value.isNativeConversationStoreReady) return
         cancelChatGeneration()
-        initChatWelcome()
-        showSnackbar("Chat history cleared.")
+        val now = System.currentTimeMillis()
+        updateActiveNativeConversation { conversation ->
+            conversation.copy(
+                title = DEFAULT_NATIVE_CONVERSATION_TITLE,
+                updatedAtEpochMs = now,
+                messages = welcomeChatMessages()
+            )
+        }
+        showSnackbar("Current conversation cleared.")
     }
 
     fun cancelChatGeneration() {
@@ -459,21 +607,26 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         activeChatGenerationId.incrementAndGet()
         chatGenerationJob?.cancel()
         chatGenerationJob = null
+        val now = System.currentTimeMillis()
         _uiState.update { state ->
+            val messages = state.chatMessages.map { message ->
+                if (message.isPartial) {
+                    message.copy(
+                        activeProfileNotes = (message.activeProfileNotes + "Generation stopped").distinct()
+                    )
+                } else {
+                    message
+                }
+            }
             state.copy(
-                chatMessages = state.chatMessages.map { message ->
-                    if (message.isPartial) {
-                        message.copy(
-                            activeProfileNotes = (message.activeProfileNotes + "Generation stopped").distinct()
-                        )
-                    } else {
-                        message
-                    }
+                nativeChat = state.nativeChat.updateActiveConversation { conversation ->
+                    conversation.copy(messages = messages, updatedAtEpochMs = now)
                 },
                 isChatGenerating = false,
                 activeGeneratingProviders = emptySet()
             )
         }
+        persistNativeChat()
     }
 
     private fun appendStreamingDelta(
@@ -501,7 +654,11 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                     isPartial = true
                 )
             }
-            state.copy(chatMessages = messages)
+            state.copy(
+                nativeChat = state.nativeChat.updateActiveConversation { conversation ->
+                    conversation.copy(messages = messages)
+                }
+            )
         }
     }
 
@@ -512,6 +669,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         response: ModelChatMessage
     ) {
         if (generationId != activeChatGenerationId.get()) return
+        val now = System.currentTimeMillis()
         _uiState.update { state ->
             if (generationId != activeChatGenerationId.get()) return@update state
             val finalMessage = response.copy(id = messageId)
@@ -522,34 +680,71 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                 state.chatMessages + finalMessage
             }
             state.copy(
-                chatMessages = messages,
+                nativeChat = state.nativeChat.updateActiveConversation { conversation ->
+                    conversation.copy(messages = messages, updatedAtEpochMs = now)
+                },
                 activeGeneratingProviders = state.activeGeneratingProviders - provider
             )
         }
+        persistNativeChat()
+    }
+
+    private fun resolveNativeChatSendPlan(state: StudioUiState): NativeChatSendPlan? {
+        val targetProvider = state.selectedChatProvider
+        if (
+            targetProvider.usesLiveFreeModelCatalog() &&
+            state.gatewayModelOptions[targetProvider]?.isEmpty() == true
+        ) {
+            showSnackbar("No free text models are currently available for ${targetProvider.shortName}.")
+            return null
+        }
+        val providersToRun = if (targetProvider == AiProvider.ALL) {
+            state.apiKeyConfig.configuredDirectProviders()
+        } else {
+            listOf(targetProvider)
+        }
+        if (targetProvider == AiProvider.ALL && providersToRun.isEmpty()) {
+            _uiState.update { it.copy(showApiKeyDialog = true) }
+            showSnackbar("Add at least one direct provider API key to use All Models.")
+            return null
+        }
+        return NativeChatSendPlan(targetProvider, providersToRun, state.apiKeyConfig)
+    }
+
+    private suspend fun prepareNativeChatPromptContext(state: StudioUiState): NativeChatPromptContext? {
+        val profileSystemPrompt = if (state.includeSystemProfileInChat) {
+            state.renderedInstructions.ifBlank { null }
+        } else {
+            null
+        }
+        val enabledLocalSkills = try {
+            localSkillStore.loadEnabledManifests()
+        } catch (error: IOException) {
+            showSnackbar(
+                (error.message ?: "Could not prepare enabled local skills.") +
+                    " No provider request was sent."
+            )
+            return null
+        }
+        return NativeChatPromptContext(
+            systemPrompt = composeLocalSkillSystemInstruction(profileSystemPrompt, enabledLocalSkills),
+            activeProfile = state.mergedProfile.takeIf { state.includeSystemProfileInChat }
+        )
     }
 
     fun sendChatMessage(prompt: String): Boolean {
         val trimmed = prompt.trim()
-        if (trimmed.isBlank() || _uiState.value.isChatGenerating) return false
-
-        val state = _uiState.value
-        val targetProvider = state.selectedChatProvider
-        val apiKeys = state.apiKeyConfig
-        if (targetProvider.usesLiveFreeModelCatalog() && state.gatewayModelOptions[targetProvider]?.isEmpty() == true) {
-            showSnackbar("No free text models are currently available for ${targetProvider.shortName}.")
+        val initialState = _uiState.value
+        if (!initialState.isNativeConversationStoreReady) {
+            showSnackbar("Conversation history is still loading.")
             return false
         }
-        val providersToRun = if (targetProvider == AiProvider.ALL) {
-            apiKeys.configuredDirectProviders()
-        } else {
-            listOf(targetProvider)
-        }
+        if (trimmed.isBlank() || initialState.isChatGenerating) return false
 
-        if (targetProvider == AiProvider.ALL && providersToRun.isEmpty()) {
-            _uiState.update { it.copy(showApiKeyDialog = true) }
-            showSnackbar("Add at least one direct provider API key to use All Models.")
-            return false
-        }
+        val plan = resolveNativeChatSendPlan(initialState) ?: return false
+        val targetProvider = plan.targetProvider
+        val providersToRun = plan.providersToRun
+        val apiKeys = plan.apiKeys
 
         val generationId = activeChatGenerationId.incrementAndGet()
         _uiState.update {
@@ -561,45 +756,33 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
 
         chatGenerationJob = viewModelScope.launch {
             try {
-                val profileSystemPrompt = if (_uiState.value.includeSystemProfileInChat) {
-                    _uiState.value.renderedInstructions.ifBlank { null }
-                } else {
-                    null
-                }
-                val enabledLocalSkills = try {
-                    localSkillStore.loadEnabledManifests()
-                } catch (error: IOException) {
-                    showSnackbar(
-                        (error.message ?: "Could not prepare enabled local skills.") +
-                            " No provider request was sent."
-                    )
-                    return@launch
-                }
-                val systemPrompt = composeLocalSkillSystemInstruction(
-                    profileSystemPrompt,
-                    enabledLocalSkills
-                )
-                val activeProfile = if (_uiState.value.includeSystemProfileInChat) {
-                    _uiState.value.mergedProfile
-                } else {
-                    null
-                }
+                val promptContext = prepareNativeChatPromptContext(_uiState.value) ?: return@launch
 
                 currentCoroutineContext().ensureActive()
                 if (generationId != activeChatGenerationId.get()) return@launch
+                val now = System.currentTimeMillis()
                 val userMessage = ModelChatMessage(
-                    id = "user_${System.currentTimeMillis()}",
+                    id = "user_$now",
                     sender = CHAT_ROLE_USER,
                     text = trimmed,
-                    timestamp = System.currentTimeMillis()
+                    timestamp = now
                 )
-                val currentMessages = _uiState.value.chatMessages + userMessage
-                _uiState.update {
-                    it.copy(
-                        chatMessages = currentMessages,
+                _uiState.update { current ->
+                    val conversation = current.activeNativeConversation
+                    val firstUserTurn = conversation?.messages?.none { it.sender == CHAT_ROLE_USER } != false
+                    current.copy(
+                        nativeChat = current.nativeChat.updateActiveConversation { active ->
+                            active.copy(
+                                title = if (firstUserTurn) nativeConversationTitle(trimmed) else active.title,
+                                updatedAtEpochMs = now,
+                                messages = active.messages + userMessage
+                            )
+                        },
                         activeGeneratingProviders = providersToRun.toSet()
                     )
                 }
+                persistNativeChat()
+                val currentMessages = _uiState.value.chatMessages
 
                 suspend fun runProvider(provider: AiProvider, model: String, allowSimulationFallback: Boolean) {
                     val streamMessageId = "stream_${userMessage.id}_${provider.id}"
@@ -608,8 +791,8 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                         provider = provider,
                         modelName = model,
                         apiKeys = apiKeys,
-                        systemInstruction = systemPrompt,
-                        profile = activeProfile,
+                        systemInstruction = promptContext.systemPrompt,
+                        profile = promptContext.activeProfile,
                         conversationHistory = currentMessages,
                         allowSimulationFallback = allowSimulationFallback,
                         onTextDelta = { delta ->
@@ -937,10 +1120,14 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     override fun onCleared() {
-        val latestSnapshot = uiState.value.toStudioStateSnapshot()
+        val latestState = uiState.value
+        val latestSnapshot = latestState.toStudioStateSnapshot()
         studioPersistenceJob?.cancel()
         studioPersistenceOwnerId?.let { ownerId ->
             studioStateWriter?.enqueue(latestSnapshot, ownerId)
+        }
+        if (latestState.isNativeConversationStoreReady) {
+            nativeChatWriter.enqueue(latestState.nativeChat)
         }
         super.onCleared()
     }

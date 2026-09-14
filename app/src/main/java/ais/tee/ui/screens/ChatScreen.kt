@@ -47,6 +47,7 @@ import ais.tee.data.document.MarkdownWorkspaceRecoveryStore
 import ais.tee.data.model.AiProvider
 import ais.tee.data.model.CHAT_ROLE_USER
 import ais.tee.data.model.ModelChatMessage
+import ais.tee.data.model.NativeChatConversation
 import ais.tee.data.model.renderChatMarkdown
 import ais.tee.data.model.isCompletedAssistantResponse
 import ais.tee.ui.theme.*
@@ -113,6 +114,7 @@ fun ChatScreen(
     var promptInput by remember { mutableStateOf("") }
     var showModelMenu by remember { mutableStateOf(false) }
     var showChatActionsMenu by remember { mutableStateOf(false) }
+    var showConversationDialog by remember { mutableStateOf(false) }
     var pendingMarkdownAsset by remember { mutableStateOf<PendingMarkdownAsset?>(null) }
     var pendingMarkdownPromptReplacement by remember { mutableStateOf<String?>(null) }
     var isPreparingChatMarkdown by remember { mutableStateOf(false) }
@@ -183,6 +185,8 @@ fun ChatScreen(
     }
 
     var previousMessageCount by remember { mutableIntStateOf(0) }
+    var previousConversationId by remember { mutableStateOf<String?>(null) }
+    val activeConversationId = uiState.nativeChat.activeConversationId
     val showJumpToLatest by remember {
         derivedStateOf {
             val layoutInfo = listState.layoutInfo
@@ -194,13 +198,19 @@ fun ChatScreen(
     }
 
     // Follow new messages only while the user is already at (or very near) the latest turn.
-    LaunchedEffect(uiState.chatMessages.size, uiState.isChatGenerating) {
+    LaunchedEffect(activeConversationId) {
+        promptInput = ""
+    }
+
+    LaunchedEffect(activeConversationId, uiState.chatMessages.size, uiState.isChatGenerating) {
         val currentMessageCount = uiState.chatMessages.size
         val lastVisibleItemIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
-        val shouldFollow = shouldAutoScrollChat(
+        val conversationChanged = previousConversationId != activeConversationId
+        val shouldFollow = conversationChanged || shouldAutoScrollChat(
             previousMessageCount = previousMessageCount,
             lastVisibleItemIndex = lastVisibleItemIndex
         )
+        previousConversationId = activeConversationId
         previousMessageCount = currentMessageCount
         if (shouldFollow && currentMessageCount > 0) {
             listState.animateScrollToItem(currentMessageCount - 1)
@@ -228,7 +238,8 @@ fun ChatScreen(
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
                         ) {
                             Box(
                                 modifier = Modifier
@@ -252,17 +263,21 @@ fun ChatScreen(
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = "AI Multi-Chat",
                                     style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "ChatGPT • Gemini • Claude",
+                                    text = uiState.activeNativeConversation?.title ?: "Native chat",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontSize = 11.sp
+                                    fontSize = 11.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
                         }
@@ -271,6 +286,18 @@ fun ChatScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
+                            IconButton(
+                                onClick = { showConversationDialog = true },
+                                enabled = uiState.isNativeConversationStoreReady,
+                                modifier = Modifier.testTag("btn_native_conversations")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.History,
+                                    contentDescription = "Native conversations",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
                             IconButton(
                                 onClick = {
                                     viewModel.toggleIncludeSystemProfile(!uiState.includeSystemProfileInChat)
@@ -382,7 +409,7 @@ fun ChatScreen(
                                         modifier = Modifier.testTag("btn_open_chat_markdown")
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Clear history") },
+                                        text = { Text("Clear conversation") },
                                         leadingIcon = {
                                             Icon(Icons.Outlined.DeleteSweep, contentDescription = null)
                                         },
@@ -692,6 +719,23 @@ fun ChatScreen(
         }
     }
 
+    if (showConversationDialog) {
+        NativeConversationsDialog(
+            conversations = uiState.nativeChat.conversations.sortedByDescending { it.updatedAtEpochMs },
+            activeConversationId = uiState.nativeChat.activeConversationId,
+            onNew = {
+                viewModel.newNativeConversation()
+                showConversationDialog = false
+            },
+            onSelect = { conversationId ->
+                viewModel.switchNativeConversation(conversationId)
+                showConversationDialog = false
+            },
+            onDelete = viewModel::deleteNativeConversation,
+            onDismiss = { showConversationDialog = false }
+        )
+    }
+
     pendingMarkdownAsset?.let { asset ->
         AlertDialog(
             onDismissRequest = { pendingMarkdownAsset = null },
@@ -747,6 +791,130 @@ fun ChatScreen(
             onDismiss = { viewModel.setShowApiKeyDialog(false) },
             onSave = { gemini, openAi, claude, deepseek, kimi, openRouter, aiHubMix ->
                 viewModel.saveApiKeys(gemini, openAi, claude, deepseek, kimi, openRouter, aiHubMix)
+            }
+        )
+    }
+}
+
+@Composable
+private fun NativeConversationsDialog(
+    conversations: List<NativeChatConversation>,
+    activeConversationId: String,
+    onNew: () -> Unit,
+    onSelect: (String) -> Unit,
+    onDelete: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var pendingDeleteId by remember { mutableStateOf<String?>(null) }
+    val pendingDelete = conversations.firstOrNull { it.id == pendingDeleteId }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Native conversations") },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                FilledTonalButton(
+                    onClick = onNew,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("btn_new_native_conversation")
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("New conversation")
+                }
+
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 360.dp)
+                ) {
+                    items(conversations, key = { it.id }) { conversation ->
+                        val isActive = conversation.id == activeConversationId
+                        val userTurns = conversation.messages.count { it.sender == CHAT_ROLE_USER }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isActive) {
+                                    MaterialTheme.colorScheme.secondaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { onSelect(conversation.id) }
+                                    .testTag("native_conversation_${conversation.id}")
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                                ) {
+                                    if (isActive) {
+                                        Icon(
+                                            Icons.Default.Check,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            conversation.title,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal
+                                        )
+                                        Text(
+                                            "${conversation.selectedProvider.shortName} • $userTurns ${if (userTurns == 1) "turn" else "turns"}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                            IconButton(
+                                onClick = { pendingDeleteId = conversation.id },
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Icon(Icons.Outlined.Delete, contentDescription = "Delete conversation")
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
+
+    pendingDelete?.let { conversation ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteId = null },
+            title = { Text("Delete conversation?") },
+            text = { Text("This removes '${conversation.title}' from local native chat history.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDelete(conversation.id)
+                        pendingDeleteId = null
+                    }
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteId = null }) { Text("Cancel") }
             }
         )
     }
