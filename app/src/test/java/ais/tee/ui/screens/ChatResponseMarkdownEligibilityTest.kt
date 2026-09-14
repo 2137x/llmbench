@@ -31,4 +31,23 @@ class ChatResponseMarkdownEligibilityTest {
         assertFalse(canOpenResponseAsMarkdown(completeResponse, true, false))
         assertFalse(canOpenResponseAsMarkdown(completeResponse, false, true))
     }
+
+    @Test
+    fun autoScrollFollowsOnlyWhenUserWasNearLatestTurn() {
+        assertTrue(shouldAutoScrollChat(previousMessageCount = 10, lastVisibleItemIndex = 9))
+        assertTrue(shouldAutoScrollChat(previousMessageCount = 10, lastVisibleItemIndex = 8))
+        assertFalse(shouldAutoScrollChat(previousMessageCount = 10, lastVisibleItemIndex = 7))
+    }
+
+    @Test
+    fun emptyChatCanFollowFirstMessage() {
+        assertTrue(shouldAutoScrollChat(previousMessageCount = 0, lastVisibleItemIndex = -1))
+    }
+
+    @Test
+    fun jumpToLatestAppearsOnlyWhenLatestRowsAreOffscreen() {
+        assertTrue(shouldShowJumpToLatest(totalItemCount = 10, lastVisibleItemIndex = 7))
+        assertFalse(shouldShowJumpToLatest(totalItemCount = 10, lastVisibleItemIndex = 8))
+        assertFalse(shouldShowJumpToLatest(totalItemCount = 0, lastVisibleItemIndex = -1))
+    }
 }

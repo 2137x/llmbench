@@ -77,6 +77,22 @@ internal fun canOpenResponseAsMarkdown(
         !isWorkspaceBusy &&
         message.isCompletedAssistantResponse()
 
+internal fun shouldAutoScrollChat(
+    previousMessageCount: Int,
+    lastVisibleItemIndex: Int
+): Boolean = previousMessageCount <= 0 || lastVisibleItemIndex >= previousMessageCount - 2
+
+internal fun shouldShowJumpToLatest(
+    totalItemCount: Int,
+    lastVisibleItemIndex: Int
+): Boolean = totalItemCount > 0 && lastVisibleItemIndex < totalItemCount - 2
+
+internal fun chatMessageContentType(message: ModelChatMessage): String = when {
+    message.sender == CHAT_ROLE_USER -> "user"
+    message.isError -> "error"
+    else -> "assistant"
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 // skipcq: KT-R1006 - Existing screen composition complexity is outside this targeted export change.
@@ -166,10 +182,28 @@ fun ChatScreen(
         }
     }
 
-    // Auto-scroll when new messages are appended
+    var previousMessageCount by remember { mutableIntStateOf(0) }
+    val showJumpToLatest by remember {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            shouldShowJumpToLatest(
+                totalItemCount = layoutInfo.totalItemsCount,
+                lastVisibleItemIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+            )
+        }
+    }
+
+    // Follow new messages only while the user is already at (or very near) the latest turn.
     LaunchedEffect(uiState.chatMessages.size, uiState.isChatGenerating) {
-        if (uiState.chatMessages.isNotEmpty()) {
-            listState.animateScrollToItem(uiState.chatMessages.size - 1)
+        val currentMessageCount = uiState.chatMessages.size
+        val lastVisibleItemIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+        val shouldFollow = shouldAutoScrollChat(
+            previousMessageCount = previousMessageCount,
+            lastVisibleItemIndex = lastVisibleItemIndex
+        )
+        previousMessageCount = currentMessageCount
+        if (shouldFollow && currentMessageCount > 0) {
+            listState.animateScrollToItem(currentMessageCount - 1)
         }
     }
 
@@ -582,55 +616,77 @@ fun ChatScreen(
         },
         modifier = modifier.fillMaxSize()
     ) { innerPadding ->
-        LazyColumn(
-            state = listState,
-            contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = innerPadding.calculateTopPadding() + 8.dp,
-                bottom = innerPadding.calculateBottomPadding() + 8.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-            modifier = Modifier
-                .fillMaxSize()
-                .testTag("chat_message_list")
-        ) {
-            items(
-                items = uiState.chatMessages,
-                key = { it.id }
-            ) { message ->
-                ChatMessageItem(
-                    message = message,
-                    canOpenMarkdown = canOpenResponseAsMarkdown(
+        Box(modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                state = listState,
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = innerPadding.calculateTopPadding() + 8.dp,
+                    bottom = innerPadding.calculateBottomPadding() + 8.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("chat_message_list")
+            ) {
+                items(
+                    items = uiState.chatMessages,
+                    key = { it.id },
+                    contentType = ::chatMessageContentType
+                ) { message ->
+                    ChatMessageItem(
                         message = message,
-                        isPreparingChatMarkdown = isPreparingChatMarkdown,
-                        isWorkspaceBusy = markdownUiState.isBusy
-                    ),
-                    onCopyText = { text ->
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val clip = ClipData.newPlainText("AI Message", text)
-                        clipboard.setPrimaryClip(clip)
-                        viewModel.showSnackbar("Copied to clipboard")
-                    },
-                    onOpenMarkdown = { response ->
-                        openMarkdownAsset(
-                            asset = PendingMarkdownAsset(
-                                text = response.text,
-                                displayName = "llmbench-${(response.provider ?: AiProvider.GEMINI).id}-response.md",
-                                sourceDescription = "this AI response"
-                            ),
-                            allowDiscardDirty = false
-                        )
-                    },
-                    onRetryPrompt = { prompt ->
-                        viewModel.sendChatMessage(prompt)
+                        canOpenMarkdown = canOpenResponseAsMarkdown(
+                            message = message,
+                            isPreparingChatMarkdown = isPreparingChatMarkdown,
+                            isWorkspaceBusy = markdownUiState.isBusy
+                        ),
+                        onCopyText = { text ->
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val clip = ClipData.newPlainText("AI Message", text)
+                            clipboard.setPrimaryClip(clip)
+                            viewModel.showSnackbar("Copied to clipboard")
+                        },
+                        onOpenMarkdown = { response ->
+                            openMarkdownAsset(
+                                asset = PendingMarkdownAsset(
+                                    text = response.text,
+                                    displayName = "llmbench-${(response.provider ?: AiProvider.GEMINI).id}-response.md",
+                                    sourceDescription = "this AI response"
+                                ),
+                                allowDiscardDirty = false
+                            )
+                        },
+                        onRetryPrompt = { prompt -> viewModel.sendChatMessage(prompt) }
+                    )
+                }
+
+                if (uiState.isChatGenerating) {
+                    item(key = "generating_indicator", contentType = "status") {
+                        GeneratingIndicator(activeProviders = uiState.activeGeneratingProviders)
                     }
-                )
+                }
             }
 
-            if (uiState.isChatGenerating) {
-                item(key = "generating_indicator") {
-                    GeneratingIndicator(activeProviders = uiState.activeGeneratingProviders)
+            AnimatedVisibility(
+                visible = showJumpToLatest,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 20.dp, bottom = innerPadding.calculateBottomPadding() + 20.dp)
+            ) {
+                SmallFloatingActionButton(
+                    onClick = {
+                        scope.launch {
+                            val lastIndex = listState.layoutInfo.totalItemsCount - 1
+                            if (lastIndex >= 0) listState.animateScrollToItem(lastIndex)
+                        }
+                    },
+                    modifier = Modifier.testTag("btn_jump_to_latest")
+                ) {
+                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Jump to latest message")
                 }
             }
         }
