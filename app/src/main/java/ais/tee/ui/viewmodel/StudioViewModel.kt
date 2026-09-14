@@ -43,6 +43,17 @@ data class ChatMessage(
     val notes: List<String> = emptyList()
 )
 
+private data class NativeChatSendPlan(
+    val targetProvider: AiProvider,
+    val providersToRun: List<AiProvider>,
+    val apiKeys: ApiKeyConfig
+)
+
+private data class NativeChatPromptContext(
+    val systemPrompt: String?,
+    val activeProfile: Profile?
+)
+
 data class StudioUiState(
     val baseProfile: Profile = PresetProfiles.DefaultBaseProfile,
     val selectedOverlay: ProfileOverlay? = null,
@@ -678,6 +689,49 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         persistNativeChat()
     }
 
+    private fun resolveNativeChatSendPlan(state: StudioUiState): NativeChatSendPlan? {
+        val targetProvider = state.selectedChatProvider
+        if (
+            targetProvider.usesLiveFreeModelCatalog() &&
+            state.gatewayModelOptions[targetProvider]?.isEmpty() == true
+        ) {
+            showSnackbar("No free text models are currently available for ${targetProvider.shortName}.")
+            return null
+        }
+        val providersToRun = if (targetProvider == AiProvider.ALL) {
+            state.apiKeyConfig.configuredDirectProviders()
+        } else {
+            listOf(targetProvider)
+        }
+        if (targetProvider == AiProvider.ALL && providersToRun.isEmpty()) {
+            _uiState.update { it.copy(showApiKeyDialog = true) }
+            showSnackbar("Add at least one direct provider API key to use All Models.")
+            return null
+        }
+        return NativeChatSendPlan(targetProvider, providersToRun, state.apiKeyConfig)
+    }
+
+    private fun prepareNativeChatPromptContext(state: StudioUiState): NativeChatPromptContext? {
+        val profileSystemPrompt = if (state.includeSystemProfileInChat) {
+            state.renderedInstructions.ifBlank { null }
+        } else {
+            null
+        }
+        val enabledLocalSkills = try {
+            localSkillStore.loadEnabledManifests()
+        } catch (error: IOException) {
+            showSnackbar(
+                (error.message ?: "Could not prepare enabled local skills.") +
+                    " No provider request was sent."
+            )
+            return null
+        }
+        return NativeChatPromptContext(
+            systemPrompt = composeLocalSkillSystemInstruction(profileSystemPrompt, enabledLocalSkills),
+            activeProfile = state.mergedProfile.takeIf { state.includeSystemProfileInChat }
+        )
+    }
+
     fun sendChatMessage(prompt: String): Boolean {
         val trimmed = prompt.trim()
         val initialState = _uiState.value
@@ -687,24 +741,10 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         }
         if (trimmed.isBlank() || initialState.isChatGenerating) return false
 
-        val state = initialState
-        val targetProvider = state.selectedChatProvider
-        val apiKeys = state.apiKeyConfig
-        if (targetProvider.usesLiveFreeModelCatalog() && state.gatewayModelOptions[targetProvider]?.isEmpty() == true) {
-            showSnackbar("No free text models are currently available for ${targetProvider.shortName}.")
-            return false
-        }
-        val providersToRun = if (targetProvider == AiProvider.ALL) {
-            apiKeys.configuredDirectProviders()
-        } else {
-            listOf(targetProvider)
-        }
-
-        if (targetProvider == AiProvider.ALL && providersToRun.isEmpty()) {
-            _uiState.update { it.copy(showApiKeyDialog = true) }
-            showSnackbar("Add at least one direct provider API key to use All Models.")
-            return false
-        }
+        val plan = resolveNativeChatSendPlan(initialState) ?: return false
+        val targetProvider = plan.targetProvider
+        val providersToRun = plan.providersToRun
+        val apiKeys = plan.apiKeys
 
         val generationId = activeChatGenerationId.incrementAndGet()
         _uiState.update {
@@ -716,29 +756,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
 
         chatGenerationJob = viewModelScope.launch {
             try {
-                val profileSystemPrompt = if (_uiState.value.includeSystemProfileInChat) {
-                    _uiState.value.renderedInstructions.ifBlank { null }
-                } else {
-                    null
-                }
-                val enabledLocalSkills = try {
-                    localSkillStore.loadEnabledManifests()
-                } catch (error: IOException) {
-                    showSnackbar(
-                        (error.message ?: "Could not prepare enabled local skills.") +
-                            " No provider request was sent."
-                    )
-                    return@launch
-                }
-                val systemPrompt = composeLocalSkillSystemInstruction(
-                    profileSystemPrompt,
-                    enabledLocalSkills
-                )
-                val activeProfile = if (_uiState.value.includeSystemProfileInChat) {
-                    _uiState.value.mergedProfile
-                } else {
-                    null
-                }
+                val promptContext = prepareNativeChatPromptContext(_uiState.value) ?: return@launch
 
                 currentCoroutineContext().ensureActive()
                 if (generationId != activeChatGenerationId.get()) return@launch
@@ -773,8 +791,8 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                         provider = provider,
                         modelName = model,
                         apiKeys = apiKeys,
-                        systemInstruction = systemPrompt,
-                        profile = activeProfile,
+                        systemInstruction = promptContext.systemPrompt,
+                        profile = promptContext.activeProfile,
                         conversationHistory = currentMessages,
                         allowSimulationFallback = allowSimulationFallback,
                         onTextDelta = { delta ->

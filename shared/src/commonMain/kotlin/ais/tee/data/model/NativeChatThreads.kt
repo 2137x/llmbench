@@ -30,8 +30,11 @@ data class NativeChatArchive(
     val conversations: List<NativeChatConversation> = emptyList()
 ) {
     val activeConversation: NativeChatConversation?
-        get() = conversations.firstOrNull { it.id == activeConversationId }
-            ?: conversations.maxByOrNull { it.updatedAtEpochMs }
+        get() {
+            if (conversations.isEmpty()) return null
+            return conversations.firstOrNull { it.id == activeConversationId }
+                ?: conversations.maxBy { it.updatedAtEpochMs }
+        }
 
     override fun toString(): String =
         "NativeChatArchive(version=$version, activeConversationId=<redacted>, " +

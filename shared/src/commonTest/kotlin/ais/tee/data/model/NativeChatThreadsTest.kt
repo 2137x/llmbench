@@ -2,6 +2,7 @@ package ais.tee.data.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -31,15 +32,18 @@ class NativeChatThreadsTest {
             selectedProvider = AiProvider.GEMINI,
             selectedModel = ""
         )
-        val normalized = NativeChatArchive(
-            activeConversationId = "missing",
-            conversations = listOf(older, newer, older.copy(title = "duplicate"))
-        ).normalized()!!
+        val normalized = assertNotNull(
+            NativeChatArchive(
+                activeConversationId = "missing",
+                conversations = listOf(older, newer, older.copy(title = "duplicate"))
+            ).normalized()
+        )
+        val activeConversation = assertNotNull(normalized.activeConversation)
 
         assertEquals(2, normalized.conversations.size)
         assertEquals("newer", normalized.activeConversationId)
-        assertEquals(DEFAULT_NATIVE_CONVERSATION_TITLE, normalized.activeConversation!!.title)
-        assertEquals(AiProvider.GEMINI.defaultModel, normalized.activeConversation!!.selectedModel)
+        assertEquals(DEFAULT_NATIVE_CONVERSATION_TITLE, activeConversation.title)
+        assertEquals(AiProvider.GEMINI.defaultModel, activeConversation.selectedModel)
         assertEquals("older", normalized.conversations.first().id)
     }
 
@@ -65,8 +69,9 @@ class NativeChatThreadsTest {
             conversations = listOf(conversation)
         )
         val encoded = NativeChatArchiveCodec.encode(archive)
-        val decoded = NativeChatArchiveCodec.decode(encoded)!!
-        val restoredMessage = decoded.activeConversation!!.messages.single()
+        val decoded = assertNotNull(NativeChatArchiveCodec.decode(encoded))
+        val restoredConversation = assertNotNull(decoded.activeConversation)
+        val restoredMessage = restoredConversation.messages.single()
 
         assertEquals("answer", restoredMessage.text)
         assertNull(restoredMessage.providerReplayState)
