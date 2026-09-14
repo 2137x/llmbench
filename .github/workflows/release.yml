@@ -11,7 +11,6 @@ on: # yamllint disable-line rule:truthy
       - "settings.gradle.kts"
       - "gradle.properties"
       - "gradle/**"
-      - ".github/scripts/gradle-version.sh"
       - ".github/workflows/release.yml"
   workflow_dispatch:
 
@@ -50,22 +49,10 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Read Gradle version
-        id: gradle
-        run: .github/scripts/gradle-version.sh
-
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
         with:
-          gradle-version: ${{ steps.gradle.outputs.version }}
           cache-disabled: true
-      - name: Generate Gradle wrapper if missing
-        env:
-          GRADLE_VERSION: ${{ steps.gradle.outputs.version }}
-        run: |
-          if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
-            gradle wrapper --gradle-version "$GRADLE_VERSION"
-          fi
 
       - name: Validate signing secrets
         id: keystore
