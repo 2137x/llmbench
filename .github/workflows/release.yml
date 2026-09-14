@@ -268,8 +268,8 @@ jobs:
             old_name="$(gh api "repos/$GH_REPO/releases/$old_id" --jq '.name // "Aistee · rolling"')"
             old_prerelease="$(gh api "repos/$GH_REPO/releases/$old_id" --jq '.prerelease')"
 
-            gh release delete "$tag" --cleanup-tag --yes
             old_deleted=true
+            gh release delete "$tag" --cleanup-tag --yes
             if ! wait_for_absent_release_and_tag "$tag"; then
               echo "::error::Previous rolling release or tag did not disappear within 60 seconds."
               exit 1
