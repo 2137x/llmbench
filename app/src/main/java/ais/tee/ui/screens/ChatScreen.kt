@@ -59,7 +59,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private const val CHAT_MARKDOWN_EXPORT_NAME = "llmbench-chat.md"
+private const val CHAT_MARKDOWN_EXPORT_NAME = "aistee-chat.md"
 private const val MAX_CHAT_PROMPT_IMPORT_CHARS = 128 * 1024
 
 private data class PendingMarkdownAsset(
