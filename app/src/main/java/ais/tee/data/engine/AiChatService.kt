@@ -206,7 +206,7 @@ class AiChatService {
             endpointUrl = "https://openrouter.ai/api/v1/chat/completions",
             modelCatalogUrl = "https://openrouter.ai/api/v1/models?output_modalities=text",
             extraHeaders = mapOf(
-                "HTTP-Referer" to "https://github.com/travnie/llmbench",
+                "HTTP-Referer" to "https://github.com/travnie/aistee",
                 "X-Title" to "Aistee"
             )
         ),
