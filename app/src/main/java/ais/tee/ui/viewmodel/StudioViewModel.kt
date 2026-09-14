@@ -711,7 +711,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         return NativeChatSendPlan(targetProvider, providersToRun, state.apiKeyConfig)
     }
 
-    private fun prepareNativeChatPromptContext(state: StudioUiState): NativeChatPromptContext? {
+    private suspend fun prepareNativeChatPromptContext(state: StudioUiState): NativeChatPromptContext? {
         val profileSystemPrompt = if (state.includeSystemProfileInChat) {
             state.renderedInstructions.ifBlank { null }
         } else {
