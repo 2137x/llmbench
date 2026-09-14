@@ -319,3 +319,9 @@ jobs:
               echo "::warning::Previous rolling release kept as $backup because cleanup failed."
             fi
           fi
+
+          legacy_tag="llmbench-latest"
+          if legacy_id="$(gh api "repos/$GH_REPO/releases/tags/$legacy_tag" --jq .id 2>/dev/null)"; then
+            gh api --method DELETE "repos/$GH_REPO/releases/$legacy_id" >/dev/null
+          fi
+          gh api --method DELETE "repos/$GH_REPO/git/refs/tags/$legacy_tag" >/dev/null 2>&1 || true
