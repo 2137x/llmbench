@@ -16,7 +16,7 @@ on: # yamllint disable-line rule:truthy
   workflow_dispatch:
 
 concurrency:
-  group: llmbench-rolling-release
+  group: aistee-rolling-release
   cancel-in-progress: false
 
 permissions:
@@ -115,10 +115,10 @@ jobs:
 
       - name: Build release APK and AAB
         env:
-          LLMBENCH_KEYSTORE: ${{ steps.keystore.outputs.path }}
-          LLMBENCH_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          LLMBENCH_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          LLMBENCH_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          AISTEE_KEYSTORE: ${{ steps.keystore.outputs.path }}
+          AISTEE_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          AISTEE_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          AISTEE_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew :app:testDebugUnitTest :app:lintDebug :shared:desktopTest :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace
 
       - name: Verify and name release artifacts
@@ -141,8 +141,8 @@ jobs:
           grep -Eq '^META-INF/.*\.(RSA|DSA|EC)$' "$aab_files"
           jarsigner -verify "$aab" >/dev/null
 
-          cp "$apk" dist/llmbench.apk
-          cp "$aab" dist/llmbench.aab
+          cp "$apk" dist/aistee.apk
+          cp "$aab" dist/aistee.aab
 
       - name: Publish rolling release
         env:
@@ -151,9 +151,9 @@ jobs:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
           set -euo pipefail
-          tag="llmbench-latest"
-          stage="llmbench-stage-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          backup="llmbench-backup-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          tag="aistee-latest"
+          stage="aistee-stage-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          backup="aistee-backup-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           release_id=""
           old_id=""
           old_ref_sha=""
@@ -253,9 +253,9 @@ jobs:
           printf 'Signed Android builds from `%s`.\n\nRolling release. Assets are replaced after each successful build of `main`.\nApp version: `%s`.\n' \
             "$GITHUB_SHA" "$RELEASE_VERSION" > release-notes.md
 
-          gh release create "$stage" dist/llmbench.apk dist/llmbench.aab \
+          gh release create "$stage" dist/aistee.apk dist/aistee.aab \
             --draft --target "$GITHUB_SHA" \
-            --title "LlmBench · rolling" --notes-file release-notes.md
+            --title "Aistee · rolling" --notes-file release-notes.md
           release_id="$(release_id_for_tag "$stage")"
           if [ -z "$release_id" ]; then
             echo "::error::Could not resolve the staged draft release."
@@ -283,7 +283,7 @@ jobs:
 
           gh api --method PATCH "repos/$GH_REPO/releases/$release_id" \
             -f tag_name="$tag" -f target_commitish="$GITHUB_SHA" \
-            -f name='LlmBench · rolling' -F draft=false -F prerelease=false \
+            -f name='Aistee · rolling' -F draft=false -F prerelease=false \
             -f make_latest=true >/dev/null
 
           if gh api "repos/$GH_REPO/git/ref/tags/$tag" >/dev/null 2>&1; then

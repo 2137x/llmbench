@@ -1,0 +1,1139 @@
+package ais.tee.ui.screens
+
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.*
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import ais.tee.data.document.MarkdownDocumentFileAccess
+import ais.tee.data.document.MarkdownWorkspaceRecoveryStore
+import ais.tee.data.model.AiProvider
+import ais.tee.data.model.CHAT_ROLE_USER
+import ais.tee.data.model.ModelChatMessage
+import ais.tee.data.model.renderChatMarkdown
+import ais.tee.data.model.isCompletedAssistantResponse
+import ais.tee.ui.theme.*
+import ais.tee.ui.viewmodel.ExternalMarkdownOpenResult
+import ais.tee.ui.viewmodel.MarkdownWorkspaceViewModel
+import ais.tee.ui.viewmodel.NavigationTab
+import ais.tee.ui.viewmodel.StudioUiState
+import ais.tee.ui.viewmodel.StudioViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+private const val CHAT_MARKDOWN_EXPORT_NAME = "llmbench-chat.md"
+private const val MAX_CHAT_PROMPT_IMPORT_CHARS = 128 * 1024
+
+private data class PendingMarkdownAsset(
+    val text: String,
+    val displayName: String,
+    val sourceDescription: String
+)
+
+internal fun canOpenResponseAsMarkdown(
+    message: ModelChatMessage,
+    isPreparingChatMarkdown: Boolean,
+    isWorkspaceBusy: Boolean
+): Boolean =
+    !isPreparingChatMarkdown &&
+        !isWorkspaceBusy &&
+        message.isCompletedAssistantResponse()
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+// skipcq: KT-R1006 - Existing screen composition complexity is outside this targeted export change.
+fun ChatScreen(
+    viewModel: StudioViewModel,
+    uiState: StudioUiState,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val markdownWorkspaceViewModel: MarkdownWorkspaceViewModel = viewModel()
+    val markdownUiState by markdownWorkspaceViewModel.uiState.collectAsStateWithLifecycle()
+    val recoveryStore = remember(context.applicationContext) {
+        MarkdownWorkspaceRecoveryStore(context.noBackupFilesDir)
+    }
+    var promptInput by remember { mutableStateOf("") }
+    var showModelMenu by remember { mutableStateOf(false) }
+    var showChatActionsMenu by remember { mutableStateOf(false) }
+    var pendingMarkdownAsset by remember { mutableStateOf<PendingMarkdownAsset?>(null) }
+    var pendingMarkdownPromptReplacement by remember { mutableStateOf<String?>(null) }
+    var isPreparingChatMarkdown by remember { mutableStateOf(false) }
+
+    SideEffect {
+        markdownWorkspaceViewModel.attachRecoveryStore(recoveryStore)
+        markdownWorkspaceViewModel.attachLifecycle(lifecycleOwner)
+    }
+
+    fun openMarkdownAsset(asset: PendingMarkdownAsset, allowDiscardDirty: Boolean) {
+        when (
+            markdownWorkspaceViewModel.openExternalText(
+                text = asset.text,
+                displayName = asset.displayName,
+                allowDiscardDirty = allowDiscardDirty
+            )
+        ) {
+            ExternalMarkdownOpenResult.OPENED -> {
+                pendingMarkdownAsset = null
+                viewModel.selectTab(NavigationTab.YAML)
+            }
+            ExternalMarkdownOpenResult.NEEDS_DISCARD -> pendingMarkdownAsset = asset
+            ExternalMarkdownOpenResult.BUSY -> viewModel.showSnackbar(
+                "Markdown workspace is still restoring or busy. Try again when it is ready."
+            )
+            ExternalMarkdownOpenResult.TOO_LARGE -> viewModel.showSnackbar(
+                "Markdown asset is larger than the 8 MiB workspace limit."
+            )
+        }
+    }
+
+    fun useMarkdownDraftAsPrompt() {
+        val markdown = markdownUiState.text
+        if (markdown.isBlank()) return
+        if (markdown.length > MAX_CHAT_PROMPT_IMPORT_CHARS) {
+            viewModel.showSnackbar(
+                "Markdown draft is too large to place directly in the chat composer. Keep it as a local asset or use a smaller prompt."
+            )
+            return
+        }
+        if (promptInput.isNotBlank() && promptInput != markdown) {
+            pendingMarkdownPromptReplacement = markdown
+        } else {
+            promptInput = markdown
+        }
+    }
+
+    val canOpenChatAsMarkdown =
+        !uiState.isChatGenerating &&
+            !isPreparingChatMarkdown &&
+            uiState.chatMessages.any { it.sender == CHAT_ROLE_USER }
+
+    val samplePrompts = listOf(
+        "Compare how you analyze edge cases in code",
+        "Explain async coroutines in Kotlin vs threads",
+        "Critique my tech architecture proposal",
+        "Summarize the key design principles of .ai profiles"
+    )
+
+    val latestAcceptedUserMessage = uiState.chatMessages.lastOrNull { it.sender == CHAT_ROLE_USER }
+    LaunchedEffect(latestAcceptedUserMessage?.id) {
+        if (
+            latestAcceptedUserMessage != null &&
+            promptInput.trim() == latestAcceptedUserMessage.text
+        ) {
+            promptInput = ""
+        }
+    }
+
+    // Auto-scroll when new messages are appended
+    LaunchedEffect(uiState.chatMessages.size, uiState.isChatGenerating) {
+        if (uiState.chatMessages.isNotEmpty()) {
+            listState.animateScrollToItem(uiState.chatMessages.size - 1)
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 3.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    // Top header row
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(
+                                                PrimaryDark,
+                                                AccentCyan,
+                                                AccentEmerald
+                                            )
+                                        )
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AutoAwesome,
+                                    contentDescription = "AI Hub",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = "AI Multi-Chat",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "ChatGPT • Gemini • Claude",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            IconButton(
+                                onClick = {
+                                    viewModel.toggleIncludeSystemProfile(!uiState.includeSystemProfileInChat)
+                                },
+                                modifier = Modifier.testTag("btn_toggle_profile_attachment")
+                            ) {
+                                Icon(
+                                    imageVector = if (uiState.includeSystemProfileInChat) Icons.Default.Psychology else Icons.Outlined.Psychology,
+                                    contentDescription = "Toggle System Profile Attachment",
+                                    tint = if (uiState.includeSystemProfileInChat) AccentCyan else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            IconButton(
+                                onClick = { viewModel.setShowApiKeyDialog(true) },
+                                modifier = Modifier.testTag("btn_api_keys_settings")
+                            ) {
+                                BadgedBox(
+                                    badge = {
+                                        val hasAnyKey = uiState.apiKeyConfig.geminiKey.isNotBlank() ||
+                                                uiState.apiKeyConfig.openAiKey.isNotBlank() ||
+                                                uiState.apiKeyConfig.claudeKey.isNotBlank() ||
+                                                uiState.apiKeyConfig.deepseekKey.isNotBlank() ||
+                                                uiState.apiKeyConfig.kimiKey.isNotBlank() ||
+                                                uiState.apiKeyConfig.openRouterKey.isNotBlank() ||
+                                                uiState.apiKeyConfig.aiHubMixKey.isNotBlank()
+                                        if (hasAnyKey) {
+                                            Badge(
+                                                containerColor = AccentEmerald,
+                                                modifier = Modifier.size(6.dp)
+                                            )
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Key,
+                                        contentDescription = "Configure API Keys",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Box {
+                                IconButton(
+                                    onClick = { showChatActionsMenu = true },
+                                    modifier = Modifier.testTag("btn_chat_more_actions")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.MoreVert,
+                                        contentDescription = "More chat actions",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = showChatActionsMenu,
+                                    onDismissRequest = { showChatActionsMenu = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Use Markdown draft as prompt") },
+                                        leadingIcon = {
+                                            Icon(Icons.Outlined.Description, contentDescription = null)
+                                        },
+                                        enabled = !uiState.isChatGenerating &&
+                                            !markdownUiState.isBusy &&
+                                            markdownUiState.text.isNotBlank(),
+                                        onClick = {
+                                            showChatActionsMenu = false
+                                            useMarkdownDraftAsPrompt()
+                                        },
+                                        modifier = Modifier.testTag("btn_use_markdown_prompt")
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Open chat as Markdown") },
+                                        leadingIcon = {
+                                            Icon(Icons.Outlined.Description, contentDescription = null)
+                                        },
+                                        enabled = canOpenChatAsMarkdown && !markdownUiState.isBusy,
+                                        onClick = {
+                                            showChatActionsMenu = false
+                                            val snapshot = uiState.chatMessages.toList()
+                                            isPreparingChatMarkdown = true
+                                            scope.launch {
+                                                try {
+                                                    val markdown = withContext(Dispatchers.Default) {
+                                                        renderChatMarkdown(
+                                                            messages = snapshot,
+                                                            maxUtf8Bytes = MarkdownDocumentFileAccess.MAX_DOCUMENT_BYTES
+                                                        )
+                                                    }
+                                                    if (markdown == null) {
+                                                        viewModel.showSnackbar(
+                                                            "Chat export is larger than the 8 MiB Markdown workspace limit."
+                                                        )
+                                                    } else {
+                                                        openMarkdownAsset(
+                                                            asset = PendingMarkdownAsset(
+                                                                text = markdown,
+                                                                displayName = CHAT_MARKDOWN_EXPORT_NAME,
+                                                                sourceDescription = "this chat snapshot"
+                                                            ),
+                                                            allowDiscardDirty = false
+                                                        )
+                                                    }
+                                                } finally {
+                                                    isPreparingChatMarkdown = false
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.testTag("btn_open_chat_markdown")
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Clear history") },
+                                        leadingIcon = {
+                                            Icon(Icons.Outlined.DeleteSweep, contentDescription = null)
+                                        },
+                                        onClick = {
+                                            showChatActionsMenu = false
+                                            viewModel.clearChatHistory()
+                                        },
+                                        modifier = Modifier.testTag("btn_clear_chat_history")
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("provider_selector_row")
+                    ) {
+                        items(AiProvider.entries) { provider ->
+                            val isSelected = uiState.selectedChatProvider == provider
+                            val providerColor = getProviderColor(provider)
+
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { viewModel.setChatProvider(provider) },
+                                label = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = getProviderIcon(provider),
+                                            contentDescription = null,
+                                            tint = if (isSelected) providerColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Text(
+                                            text = provider.shortName,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = providerColor.copy(alpha = 0.15f),
+                                    selectedLabelColor = providerColor
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    enabled = true,
+                                    selected = isSelected,
+                                    selectedBorderColor = providerColor,
+                                    borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                                ),
+                                modifier = Modifier.testTag("chip_provider_${provider.id}")
+                            )
+                        }
+                    }
+
+                    if (uiState.selectedChatProvider != AiProvider.ALL) {
+                        val selectedProvider = uiState.selectedChatProvider
+                        val modelOptions = uiState.gatewayModelOptions[selectedProvider]
+                            ?: selectedProvider.availableModels
+                        val isRefreshingCatalog = selectedProvider in uiState.refreshingGatewayCatalogs
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { showModelMenu = true }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "Model: ${uiState.selectedChatModel.ifBlank { "No free models" }}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            if (isRefreshingCatalog) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(14.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDropDown,
+                                    contentDescription = "Change Model",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = showModelMenu,
+                                onDismissRequest = { showModelMenu = false }
+                            ) {
+                                modelOptions.forEach { model ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = model,
+                                                fontWeight = if (uiState.selectedChatModel == model) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        },
+                                        onClick = {
+                                            viewModel.setChatModel(model)
+                                            showModelMenu = false
+                                        },
+                                        leadingIcon = {
+                                            if (uiState.selectedChatModel == model) {
+                                                Icon(
+                                                    Icons.Default.Check,
+                                                    contentDescription = null,
+                                                    tint = getProviderColor(uiState.selectedChatProvider),
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        bottomBar = {
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.ime)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 6.dp)
+                    ) {
+                        items(samplePrompts) { prompt ->
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier
+                                    .clickable {
+                                        viewModel.sendChatMessage(prompt)
+                                    }
+                                    .testTag("sample_chat_prompt_${prompt.take(12)}")
+                            ) {
+                                Text(
+                                    text = prompt,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        OutlinedTextField(
+                            value = promptInput,
+                            onValueChange = { promptInput = it },
+                            placeholder = {
+                                val destination = when (uiState.selectedChatProvider) {
+                                    AiProvider.ALL -> "Ask Gemini, ChatGPT, Claude, DeepSeek & Kimi..."
+                                    AiProvider.GEMINI -> "Ask Google Gemini..."
+                                    AiProvider.CHATGPT -> "Ask OpenAI ChatGPT..."
+                                    AiProvider.CLAUDE -> "Ask Anthropic Claude..."
+                                    AiProvider.DEEPSEEK -> "Ask DeepSeek..."
+                                    AiProvider.KIMI -> "Ask Moonshot Kimi..."
+                                    AiProvider.OPENROUTER -> "Ask a free OpenRouter model..."
+                                    AiProvider.AIHUBMIX -> "Ask a free AIHubMix model..."
+                                }
+                                Text(
+                                    text = destination,
+                                    fontSize = 13.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            },
+                            maxLines = 4,
+                            shape = RoundedCornerShape(24.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("chat_input_field")
+                        )
+
+                        FloatingActionButton(
+                            onClick = {
+                                if (uiState.isChatGenerating) {
+                                    viewModel.cancelChatGeneration()
+                                } else if (promptInput.isNotBlank()) {
+                                    viewModel.sendChatMessage(promptInput)
+                                }
+                            },
+                            shape = CircleShape,
+                            containerColor = getProviderColor(uiState.selectedChatProvider),
+                            contentColor = Color.White,
+                            elevation = FloatingActionButtonDefaults.elevation(0.dp),
+                            modifier = Modifier
+                                .size(48.dp)
+                                .testTag(if (uiState.isChatGenerating) "stop_generation_button" else "send_prompt_button")
+                        ) {
+                            Icon(
+                                imageVector = if (uiState.isChatGenerating) Icons.Default.Stop else Icons.Default.Send,
+                                contentDescription = if (uiState.isChatGenerating) "Stop generation" else "Send Prompt",
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        modifier = modifier.fillMaxSize()
+    ) { innerPadding ->
+        LazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = innerPadding.calculateTopPadding() + 8.dp,
+                bottom = innerPadding.calculateBottomPadding() + 8.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .testTag("chat_message_list")
+        ) {
+            items(
+                items = uiState.chatMessages,
+                key = { it.id }
+            ) { message ->
+                ChatMessageItem(
+                    message = message,
+                    canOpenMarkdown = canOpenResponseAsMarkdown(
+                        message = message,
+                        isPreparingChatMarkdown = isPreparingChatMarkdown,
+                        isWorkspaceBusy = markdownUiState.isBusy
+                    ),
+                    onCopyText = { text ->
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        val clip = ClipData.newPlainText("AI Message", text)
+                        clipboard.setPrimaryClip(clip)
+                        viewModel.showSnackbar("Copied to clipboard")
+                    },
+                    onOpenMarkdown = { response ->
+                        openMarkdownAsset(
+                            asset = PendingMarkdownAsset(
+                                text = response.text,
+                                displayName = "llmbench-${(response.provider ?: AiProvider.GEMINI).id}-response.md",
+                                sourceDescription = "this AI response"
+                            ),
+                            allowDiscardDirty = false
+                        )
+                    },
+                    onRetryPrompt = { prompt ->
+                        viewModel.sendChatMessage(prompt)
+                    }
+                )
+            }
+
+            if (uiState.isChatGenerating) {
+                item(key = "generating_indicator") {
+                    GeneratingIndicator(activeProviders = uiState.activeGeneratingProviders)
+                }
+            }
+        }
+    }
+
+    pendingMarkdownAsset?.let { asset ->
+        AlertDialog(
+            onDismissRequest = { pendingMarkdownAsset = null },
+            title = { Text("Replace unsaved Markdown draft?") },
+            text = {
+                Text(
+                    "${markdownUiState.displayName} has edits that have not been exported. Discard them and open ${asset.sourceDescription} as a new local Markdown draft?"
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { openMarkdownAsset(asset, allowDiscardDirty = true) },
+                    modifier = Modifier.testTag("btn_confirm_markdown_asset_replace")
+                ) {
+                    Text("Discard and open")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingMarkdownAsset = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    pendingMarkdownPromptReplacement?.let { markdown ->
+        AlertDialog(
+            onDismissRequest = { pendingMarkdownPromptReplacement = null },
+            title = { Text("Replace chat prompt?") },
+            text = {
+                Text(
+                    "The composer already contains text. Replace it with the current Markdown draft? Nothing will be sent until you tap Send."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        promptInput = markdown
+                        pendingMarkdownPromptReplacement = null
+                    },
+                    modifier = Modifier.testTag("btn_confirm_markdown_prompt_replace")
+                ) {
+                    Text("Replace")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingMarkdownPromptReplacement = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (uiState.showApiKeyDialog) {
+        ApiKeySettingsDialog(
+            currentKeys = uiState.apiKeyConfig,
+            onDismiss = { viewModel.setShowApiKeyDialog(false) },
+            onSave = { gemini, openAi, claude, deepseek, kimi, openRouter, aiHubMix ->
+                viewModel.saveApiKeys(gemini, openAi, claude, deepseek, kimi, openRouter, aiHubMix)
+            }
+        )
+    }
+}
+
+@Composable
+fun ChatMessageItem(
+    message: ModelChatMessage,
+    canOpenMarkdown: Boolean,
+    onCopyText: (String) -> Unit,
+    onOpenMarkdown: (ModelChatMessage) -> Unit,
+    onRetryPrompt: (String) -> Unit
+) {
+    val isUser = message.sender == "user"
+    val provider = message.provider ?: AiProvider.GEMINI
+    val providerColor = getProviderColor(provider)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(if (isUser) "user_message_bubble" else "assistant_message_bubble_${provider.id}"),
+        horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(bottom = 4.dp, start = 4.dp, end = 4.dp)
+        ) {
+            if (!isUser) {
+                Box(
+                    modifier = Modifier
+                        .size(18.dp)
+                        .clip(CircleShape)
+                        .background(providerColor.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = getProviderIcon(provider),
+                        contentDescription = null,
+                        tint = providerColor,
+                        modifier = Modifier.size(12.dp)
+                    )
+                }
+                Text(
+                    text = provider.displayName,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = providerColor
+                )
+                message.modelName?.let { model ->
+                    Text(
+                        text = "• $model",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (message.isSimulated) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        modifier = Modifier.testTag("badge_simulated_${message.id}")
+                    ) {
+                        Text(
+                            text = "SIMULATED",
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
+                }
+            } else {
+                Text(
+                    text = "You",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        }
+
+        Card(
+            shape = RoundedCornerShape(
+                topStart = 16.dp,
+                topEnd = 16.dp,
+                bottomStart = if (isUser) 16.dp else 4.dp,
+                bottomEnd = if (isUser) 4.dp else 16.dp
+            ),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isUser) {
+                    MaterialTheme.colorScheme.primary
+                } else if (message.isError) {
+                    MaterialTheme.colorScheme.errorContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                }
+            ),
+            border = if (!isUser) {
+                BorderStroke(1.dp, providerColor.copy(alpha = 0.25f))
+            } else null,
+            modifier = Modifier.widthIn(max = 340.dp)
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text(
+                    text = message.text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (isUser) {
+                        MaterialTheme.colorScheme.onPrimary
+                    } else if (message.isError) {
+                        MaterialTheme.colorScheme.onErrorContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    lineHeight = 21.sp
+                )
+
+                if (!isUser) {
+                    formatChatResponseDiagnostics(message)?.let { diagnostics ->
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = diagnostics,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                            lineHeight = 14.sp
+                        )
+                    }
+                }
+
+                if (!isUser && message.activeProfileNotes.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.5f))
+                            .padding(8.dp)
+                    ) {
+                        message.activeProfileNotes.forEach { note ->
+                            Text(
+                                text = "• $note",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 14.sp
+                            )
+                        }
+                    }
+                }
+
+                if (!isUser) {
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        IconButton(
+                            onClick = { onOpenMarkdown(message) },
+                            enabled = canOpenMarkdown,
+                            modifier = Modifier
+                                .size(28.dp)
+                                .testTag("btn_open_response_markdown_${message.id}")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Description,
+                                contentDescription = "Open response as Markdown",
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                        IconButton(
+                            onClick = { onCopyText(message.text) },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.ContentCopy,
+                                contentDescription = "Copy message",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun GeneratingIndicator(activeProviders: Set<AiProvider>) {
+    val infiniteTransition = rememberInfiniteTransition(label = "dots")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(600, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "alpha"
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp),
+        horizontalAlignment = Alignment.Start
+    ) {
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            )
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = AccentCyan
+                )
+                val providerNames = if (activeProviders.isEmpty()) {
+                    "AI Assistant"
+                } else {
+                    activeProviders.joinToString(", ") { it.shortName }
+                }
+                Text(
+                    text = "Generating response from $providerNames...",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ApiKeySettingsDialog(
+    currentKeys: ais.tee.data.model.ApiKeyConfig,
+    onDismiss: () -> Unit,
+    onSave: (
+        gemini: String,
+        openAi: String,
+        claude: String,
+        deepseek: String,
+        kimi: String,
+        openRouter: String,
+        aiHubMix: String
+    ) -> Unit
+) {
+    var geminiKey by remember { mutableStateOf(currentKeys.geminiKey) }
+    var openAiKey by remember { mutableStateOf(currentKeys.openAiKey) }
+    var claudeKey by remember { mutableStateOf(currentKeys.claudeKey) }
+    var deepseekKey by remember { mutableStateOf(currentKeys.deepseekKey) }
+    var kimiKey by remember { mutableStateOf(currentKeys.kimiKey) }
+    var openRouterKey by remember { mutableStateOf(currentKeys.openRouterKey) }
+    var aiHubMixKey by remember { mutableStateOf(currentKeys.aiHubMixKey) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(Icons.Default.Key, contentDescription = null, tint = AccentEmerald)
+                Text("AI Provider API Keys", fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Enter API keys for direct providers and optional gateways. Keys are stored locally on device.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                OutlinedTextField(
+                    value = geminiKey,
+                    onValueChange = { geminiKey = it },
+                    label = { Text("Google Gemini API Key") },
+                    placeholder = { Text("AIzaSy...") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    leadingIcon = {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = AccentCyan)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_gemini_api_key")
+                )
+
+                OutlinedTextField(
+                    value = openAiKey,
+                    onValueChange = { openAiKey = it },
+                    label = { Text("OpenAI API Key (ChatGPT)") },
+                    placeholder = { Text("sk-...") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    leadingIcon = {
+                        Icon(Icons.Default.SmartToy, contentDescription = null, tint = AccentEmerald)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_openai_api_key")
+                )
+
+                OutlinedTextField(
+                    value = claudeKey,
+                    onValueChange = { claudeKey = it },
+                    label = { Text("Anthropic Claude API Key") },
+                    placeholder = { Text("sk-ant-...") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    leadingIcon = {
+                        Icon(Icons.Default.Flare, contentDescription = null, tint = AccentAmber)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_claude_api_key")
+                )
+
+                OutlinedTextField(
+                    value = deepseekKey,
+                    onValueChange = { deepseekKey = it },
+                    label = { Text("DeepSeek API Key") },
+                    placeholder = { Text("sk-...") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    leadingIcon = {
+                        Icon(Icons.Default.Psychology, contentDescription = null, tint = Color(0xFF2563EB))
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_deepseek_api_key")
+                )
+
+                OutlinedTextField(
+                    value = kimiKey,
+                    onValueChange = { kimiKey = it },
+                    label = { Text("Moonshot Kimi API Key") },
+                    placeholder = { Text("sk-...") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    leadingIcon = {
+                        Icon(Icons.Default.ElectricBolt, contentDescription = null, tint = Color(0xFF8B5CF6))
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_kimi_api_key")
+                )
+
+                OutlinedTextField(
+                    value = openRouterKey,
+                    onValueChange = { openRouterKey = it },
+                    label = { Text("OpenRouter API Key") },
+                    placeholder = { Text("sk-or-v1-...") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    leadingIcon = {
+                        Icon(Icons.Default.Route, contentDescription = null, tint = Color(0xFF6366F1))
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_openrouter_api_key")
+                )
+
+                OutlinedTextField(
+                    value = aiHubMixKey,
+                    onValueChange = { aiHubMixKey = it },
+                    label = { Text("AIHubMix API Key") },
+                    placeholder = { Text("sk-...") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    leadingIcon = {
+                        Icon(Icons.Default.Cloud, contentDescription = null, tint = Color(0xFF14B8A6))
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_aihubmix_api_key")
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onSave(geminiKey, openAiKey, claudeKey, deepseekKey, kimiKey, openRouterKey, aiHubMixKey) },
+                colors = ButtonDefaults.buttonColors(containerColor = AccentEmerald),
+                modifier = Modifier.testTag("btn_save_api_keys")
+            ) {
+                Text("Save Keys")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.testTag("btn_cancel_api_keys")
+            ) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+fun getProviderColor(provider: AiProvider): Color {
+    return when (provider) {
+        AiProvider.GEMINI -> Color(0xFF0EA5E9)
+        AiProvider.CHATGPT -> Color(0xFF10B981)
+        AiProvider.CLAUDE -> Color(0xFFF59E0B)
+        AiProvider.DEEPSEEK -> Color(0xFF2563EB)
+        AiProvider.KIMI -> Color(0xFF8B5CF6)
+        AiProvider.OPENROUTER -> Color(0xFF6366F1)
+        AiProvider.AIHUBMIX -> Color(0xFF14B8A6)
+        AiProvider.ALL -> Color(0xFF8B5CF6)
+    }
+}
+
+fun getProviderIcon(provider: AiProvider): ImageVector {
+    return when (provider) {
+        AiProvider.GEMINI -> Icons.Default.AutoAwesome
+        AiProvider.CHATGPT -> Icons.Default.SmartToy
+        AiProvider.CLAUDE -> Icons.Default.Flare
+        AiProvider.DEEPSEEK -> Icons.Default.Psychology
+        AiProvider.KIMI -> Icons.Default.ElectricBolt
+        AiProvider.OPENROUTER -> Icons.Default.Route
+        AiProvider.AIHUBMIX -> Icons.Default.Cloud
+        AiProvider.ALL -> Icons.Default.Hub
+    }
+}

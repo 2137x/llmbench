@@ -1,10 +1,10 @@
 # AGENTS.md
 
-LlmBench is a Kotlin Multiplatform project with Android as the first shipping client.
+Aistee is a Kotlin Multiplatform project with Android as the first shipping client.
 
 ## Repository boundaries
 
-- If LlmBench consumes `.ai`, use an explicit adapter/import boundary and keep `.ai` canonical upstream.
+- If Aistee consumes `.ai`, use an explicit adapter/import boundary and keep `.ai` canonical upstream.
 - Prefer extending the existing module structure over creating parallel implementations.
 - Product priority: improve account-backed WebView chats first; native/API-key chat is secondary unless the task explicitly targets it.
 
@@ -23,5 +23,5 @@ LlmBench is a Kotlin Multiplatform project with Android as the first shipping cl
 
 - Inspect current main, open PRs and recent changes before overlapping work.
 - Keep one logical change per pull request.
-- Use `LlmBench` as the project name and `com.twojstar.llmbench` as the canonical Android application ID; shared modules use distinct namespaces under that root.
+- Use `Aistee` as the project name and `ais.tee` as the canonical Android application ID; shared modules use distinct namespaces under that root.
 - Keep documentation short and update it when provider support or security assumptions change.

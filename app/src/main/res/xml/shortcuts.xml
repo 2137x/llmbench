@@ -2,9 +2,9 @@
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
     <capability android:name="actions.intent.CREATE_MESSAGE">
         <intent
-            android:action="com.twojstar.llmbench.action.CREATE_MESSAGE"
-            android:targetPackage="com.twojstar.llmbench"
-            android:targetClass="com.twojstar.llmbench.MainActivity">
+            android:action="ais.tee.action.CREATE_MESSAGE"
+            android:targetPackage="ais.tee"
+            android:targetClass="ais.tee.MainActivity">
             <parameter
                 android:name="message.text"
                 android:key="text"
@@ -17,10 +17,10 @@
         android:shortcutShortLabel="@string/shortcut_web_ai_short"
         android:shortcutLongLabel="@string/shortcut_web_ai_long">
         <intent
-            android:action="com.twojstar.llmbench.action.OPEN_DESTINATION"
-            android:data="llmbench://quick-action/web_ai"
-            android:targetPackage="com.twojstar.llmbench"
-            android:targetClass="com.twojstar.llmbench.MainActivity" />
+            android:action="ais.tee.action.OPEN_DESTINATION"
+            android:data="aistee://quick-action/web_ai"
+            android:targetPackage="ais.tee"
+            android:targetClass="ais.tee.MainActivity" />
     </shortcut>
     <shortcut
         android:shortcutId="compare"
@@ -28,10 +28,10 @@
         android:shortcutShortLabel="@string/shortcut_compare_short"
         android:shortcutLongLabel="@string/shortcut_compare_long">
         <intent
-            android:action="com.twojstar.llmbench.action.OPEN_DESTINATION"
-            android:data="llmbench://quick-action/compare"
-            android:targetPackage="com.twojstar.llmbench"
-            android:targetClass="com.twojstar.llmbench.MainActivity" />
+            android:action="ais.tee.action.OPEN_DESTINATION"
+            android:data="aistee://quick-action/compare"
+            android:targetPackage="ais.tee"
+            android:targetClass="ais.tee.MainActivity" />
     </shortcut>
     <shortcut
         android:shortcutId="studio"
@@ -39,9 +39,9 @@
         android:shortcutShortLabel="@string/shortcut_studio_short"
         android:shortcutLongLabel="@string/shortcut_studio_long">
         <intent
-            android:action="com.twojstar.llmbench.action.OPEN_DESTINATION"
-            android:data="llmbench://quick-action/studio"
-            android:targetPackage="com.twojstar.llmbench"
-            android:targetClass="com.twojstar.llmbench.MainActivity" />
+            android:action="ais.tee.action.OPEN_DESTINATION"
+            android:data="aistee://quick-action/studio"
+            android:targetPackage="ais.tee"
+            android:targetClass="ais.tee.MainActivity" />
     </shortcut>
 </shortcuts>

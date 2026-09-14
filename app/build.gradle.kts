@@ -6,21 +6,21 @@ plugins {
 
 // Release signing is opt-in. GitHub Actions injects these values from repository
 // secrets; local/debug builds stay unsigned and no key material is stored in Git.
-val releaseKeystorePath = System.getenv("LLMBENCH_KEYSTORE")?.takeIf { it.isNotBlank() }
-val releaseStorePassword = System.getenv("LLMBENCH_KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }
-val releaseKeyAlias = System.getenv("LLMBENCH_KEY_ALIAS")?.takeIf { it.isNotBlank() }
-val releaseKeyPassword = System.getenv("LLMBENCH_KEY_PASSWORD")?.takeIf { it.isNotBlank() }
+val releaseKeystorePath = System.getenv("AISTEE_KEYSTORE")?.takeIf { it.isNotBlank() }
+val releaseStorePassword = System.getenv("AISTEE_KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }
+val releaseKeyAlias = System.getenv("AISTEE_KEY_ALIAS")?.takeIf { it.isNotBlank() }
+val releaseKeyPassword = System.getenv("AISTEE_KEY_PASSWORD")?.takeIf { it.isNotBlank() }
 val releaseSigningValues = listOf(releaseStorePassword, releaseKeyAlias, releaseKeyPassword)
 if (releaseKeystorePath != null && releaseSigningValues.any { it == null }) {
-    error("LLMBENCH_KEYSTORE requires non-blank signing password and alias environment variables")
+    error("AISTEE_KEYSTORE requires non-blank signing password and alias environment variables")
 }
 
 android {
-    namespace = "com.twojstar.llmbench"
+    namespace = "ais.tee"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.twojstar.llmbench"
+        applicationId = "ais.tee"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

@@ -1,11 +1,11 @@
 # Third-party notices
 
-LlmBench includes the following third-party software.
+Aistee includes the following third-party software.
 
 ## JTokkit 1.1.0
 
 - Project: JTokkit by Knuddels GmbH & Co. KG / contributors
-- Purpose in LlmBench: local `o200k_base` token counting on Android
+- Purpose in Aistee: local `o200k_base` token counting on Android
 - License: MIT
 - Copyright: © 2023 Knuddels, Philip Müller
 
