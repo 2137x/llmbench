@@ -287,16 +287,25 @@ jobs:
             -f make_latest=true >/dev/null
 
           tag_synced=false
-          for attempt in 1 2 3 4 5; do
-            if gh api --method PATCH "repos/$GH_REPO/git/refs/tags/$tag" \
-              -f sha="$GITHUB_SHA" -F force=true >/dev/null 2>&1; then
+          deadline=$((SECONDS + 60))
+          last_error=""
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            if last_error="$(gh api --method PATCH "repos/$GH_REPO/git/refs/tags/$tag" \
+              -f sha="$GITHUB_SHA" -F force=true 2>&1 >/dev/null)"; then
               tag_synced=true
               break
             fi
-            [ "$attempt" -eq 5 ] || sleep "$attempt"
+
+            if ! printf '%s\n' "$last_error" | grep -Eq '\(HTTP (404|408|429|5[0-9]{2})\)'; then
+              echo "::error::Could not synchronize the promoted release tag."
+              printf '%s\n' "$last_error" >&2
+              exit 1
+            fi
+            sleep 5
           done
           if [ "$tag_synced" != true ]; then
-            echo "::error::Promoted release tag did not become available in time."
+            echo "::error::Promoted release tag did not become available within 60 seconds."
+            printf '%s\n' "$last_error" >&2
             exit 1
           fi
           promoted=true
