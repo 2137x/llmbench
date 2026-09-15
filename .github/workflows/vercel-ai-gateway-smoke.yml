@@ -46,7 +46,7 @@ jobs:
               if model.get('type') == 'language'
               and 'text' in model.get('modalities', {}).get('output', ['text'])
           ]
-          preferred = next((m for m in language if m.get('id') == 'alibaba/qwen-3-14b'), None)
+          preferred = next((m for m in language if m.get('id') == 'alibaba/qwen3-coder-30b-a3b'), None)
           if preferred is None:
               def cost(model):
                   pricing = model.get('pricing') or {}
@@ -94,3 +94,4 @@ jobs:
               raise SystemExit(f'No text content in gateway response: {response}')
           print(f'Gateway response: {content!r}')
           PY
+
