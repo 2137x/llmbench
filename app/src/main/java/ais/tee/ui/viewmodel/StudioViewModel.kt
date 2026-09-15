@@ -24,6 +24,7 @@ import ais.tee.share.completeTextClaim
 import ais.tee.share.releaseTextClaim
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -53,6 +54,8 @@ private data class NativeChatPromptContext(
     val systemPrompt: String?,
     val activeProfile: Profile?
 )
+
+private const val STREAMING_UI_FLUSH_INTERVAL_MS = 50L
 
 data class StudioUiState(
     val baseProfile: Profile = PresetProfiles.DefaultBaseProfile,
@@ -131,6 +134,8 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
     )
     private val pendingGatewayCatalogRefreshes = mutableSetOf<AiProvider>()
     private var chatGenerationJob: Job? = null
+    private val streamingTextBatcher = StreamingTextBatcher()
+    private var streamingUiFlushJob: Job? = null
     private var studioPersistenceJob: Job? = null
     private var studioPersistenceOwnerId: Long? = null
     private val activeChatGenerationId = AtomicLong(0)
@@ -604,7 +609,12 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
 
     fun cancelChatGeneration() {
         if (!_uiState.value.isChatGenerating) return
+        val cancelledGenerationId = activeChatGenerationId.get()
+        flushStreamingGeneration(cancelledGenerationId)
         activeChatGenerationId.incrementAndGet()
+        streamingUiFlushJob?.cancel()
+        streamingUiFlushJob = null
+        streamingTextBatcher.drainGeneration(cancelledGenerationId)
         chatGenerationJob?.cancel()
         chatGenerationJob = null
         val now = System.currentTimeMillis()
@@ -629,30 +639,29 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         persistNativeChat()
     }
 
-    private fun appendStreamingDelta(
-        generationId: Long,
-        messageId: String,
-        provider: AiProvider,
-        model: String,
-        delta: String
-    ) {
-        if (delta.isEmpty() || generationId != activeChatGenerationId.get()) return
+    private fun flushStreamingGeneration(generationId: Long) {
+        val batches = streamingTextBatcher.drainGeneration(generationId)
+        if (batches.isEmpty() || generationId != activeChatGenerationId.get()) return
         _uiState.update { state ->
             if (generationId != activeChatGenerationId.get()) return@update state
-            val index = state.chatMessages.indexOfFirst { it.id == messageId }
-            val messages = if (index >= 0) {
-                state.chatMessages.toMutableList().apply {
-                    this[index] = this[index].copy(text = this[index].text + delta)
+            var messages = state.chatMessages
+            batches.forEach { batch ->
+                val target = batch.target
+                val index = messages.indexOfFirst { it.id == target.messageId }
+                messages = if (index >= 0) {
+                    messages.toMutableList().apply {
+                        this[index] = this[index].copy(text = this[index].text + batch.text)
+                    }
+                } else {
+                    messages + ModelChatMessage(
+                        id = target.messageId,
+                        sender = CHAT_ROLE_ASSISTANT,
+                        provider = target.provider,
+                        modelName = target.model,
+                        text = batch.text,
+                        isPartial = true
+                    )
                 }
-            } else {
-                state.chatMessages + ModelChatMessage(
-                    id = messageId,
-                    sender = CHAT_ROLE_ASSISTANT,
-                    provider = provider,
-                    modelName = model,
-                    text = delta,
-                    isPartial = true
-                )
             }
             state.copy(
                 nativeChat = state.nativeChat.updateActiveConversation { conversation ->
@@ -662,6 +671,22 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private fun appendStreamingDelta(
+        generationId: Long,
+        messageId: String,
+        provider: AiProvider,
+        model: String,
+        delta: String
+    ) {
+        if (delta.isEmpty() || generationId != activeChatGenerationId.get()) return
+        streamingTextBatcher.append(
+            StreamingTextTarget(generationId, messageId, provider, model),
+            delta
+        )
+        if (_uiState.value.chatMessages.none { it.id == messageId }) {
+            flushStreamingGeneration(generationId)
+        }
+    }
     private fun finishStreamingMessage(
         generationId: Long,
         messageId: String,
@@ -669,6 +694,8 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         response: ModelChatMessage
     ) {
         if (generationId != activeChatGenerationId.get()) return
+        flushStreamingGeneration(generationId)
+        streamingTextBatcher.discard(generationId, messageId)
         val now = System.currentTimeMillis()
         _uiState.update { state ->
             if (generationId != activeChatGenerationId.get()) return@update state
@@ -747,6 +774,13 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         val apiKeys = plan.apiKeys
 
         val generationId = activeChatGenerationId.incrementAndGet()
+        streamingUiFlushJob?.cancel()
+        streamingUiFlushJob = viewModelScope.launch {
+            while (generationId == activeChatGenerationId.get()) {
+                delay(STREAMING_UI_FLUSH_INTERVAL_MS)
+                flushStreamingGeneration(generationId)
+            }
+        }
         _uiState.update {
             it.copy(
                 isChatGenerating = true,
@@ -817,6 +851,10 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                 }
             } finally {
                 if (generationId == activeChatGenerationId.get()) {
+                    flushStreamingGeneration(generationId)
+                    streamingUiFlushJob?.cancel()
+                    streamingUiFlushJob = null
+                    streamingTextBatcher.drainGeneration(generationId)
                     chatGenerationJob = null
                     _uiState.update {
                         it.copy(
