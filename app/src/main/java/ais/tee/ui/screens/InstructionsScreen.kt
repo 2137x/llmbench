@@ -9,7 +9,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -136,7 +135,7 @@ fun InstructionsScreen(
             // Language Switcher Banner
             item {
                 Card(
-                    shape = RoundedCornerShape(16.dp),
+                    shape = MaterialTheme.shapes.medium,
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                     ),
@@ -165,7 +164,7 @@ fun InstructionsScreen(
                             listOf("auto" to "Auto", "en" to "EN", "pl" to "PL").forEach { (code, label) ->
                                 val isSelected = uiState.language == code
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = MaterialTheme.shapes.small,
                                     color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
                                     modifier = Modifier.testTag("lang_$code")
                                 ) {
@@ -190,7 +189,7 @@ fun InstructionsScreen(
             // Quick Playground Action Banner
             item {
                 Card(
-                    shape = RoundedCornerShape(16.dp),
+                    shape = MaterialTheme.shapes.medium,
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
                     ),
@@ -244,7 +243,7 @@ fun InstructionsScreen(
                 val isBoundary = index == lines.lastIndex
 
                 Card(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.medium,
                     colors = CardDefaults.cardColors(
                         containerColor = when {
                             isCore -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
@@ -270,7 +269,7 @@ fun InstructionsScreen(
                         verticalAlignment = Alignment.Top
                     ) {
                         Surface(
-                            shape = RoundedCornerShape(6.dp),
+                            shape = MaterialTheme.shapes.extraSmall,
                             color = MaterialTheme.colorScheme.surfaceVariant,
                             modifier = Modifier.size(24.dp)
                         ) {
@@ -316,7 +315,7 @@ fun InstructionsScreen(
             // Raw Text Box (Monospace)
             item {
                 Card(
-                    shape = RoundedCornerShape(14.dp),
+                    shape = MaterialTheme.shapes.medium,
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
                     ),
@@ -354,7 +353,7 @@ fun InstructionsScreen(
                             lineHeight = 16.sp,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(MaterialTheme.shapes.small)
                                 .background(MaterialTheme.colorScheme.background.copy(alpha = 0.6f))
                                 .padding(10.dp)
                         )
