@@ -8,7 +8,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -67,7 +66,7 @@ fun StudioScreen(
                             )
                             Spacer(Modifier.width(8.dp))
                             Surface(
-                                shape = RoundedCornerShape(6.dp),
+                                shape = MaterialTheme.shapes.extraSmall,
                                 color = MaterialTheme.colorScheme.primaryContainer
                             ) {
                                 Text(
@@ -174,7 +173,7 @@ fun StudioScreen(
             // Preset / Overlay Selector Row
             item {
                 Card(
-                    shape = RoundedCornerShape(16.dp),
+                    shape = MaterialTheme.shapes.medium,
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
                     ),
@@ -193,7 +192,7 @@ fun StudioScreen(
                             )
                             if (uiState.selectedOverlay != null) {
                                 Surface(
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = MaterialTheme.shapes.medium,
                                     color = AccentEmerald.copy(alpha = 0.2f),
                                     contentColor = AccentEmerald
                                 ) {
@@ -278,7 +277,7 @@ fun StudioScreen(
                             items(bases) { (baseKey, baseLabel) ->
                                 val isSelected = activeProfile.personality.base == baseKey
                                 Surface(
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = MaterialTheme.shapes.small,
                                     color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                                     modifier = Modifier
                                         .clickable { viewModel.setBasePersonality(baseKey) }
@@ -314,7 +313,7 @@ fun StudioScreen(
                             ).forEach { (lvl, lbl) ->
                                 val isSelected = (activeProfile.personality.intensity ?: 1) == lvl
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = MaterialTheme.shapes.small,
                                     color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
                                     border = androidx.compose.foundation.BorderStroke(
                                         1.dp,
@@ -710,7 +709,7 @@ private fun PromptRoutePreviewCard(uiState: StudioUiState) {
     }
 
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f)
         ),
@@ -800,7 +799,7 @@ fun AccordionSectionCard(
     content: @Composable () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
@@ -824,7 +823,7 @@ fun AccordionSectionCard(
                     Box(
                         modifier = Modifier
                             .size(36.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(MaterialTheme.shapes.small)
                             .background(MaterialTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
