@@ -192,7 +192,7 @@ fun StudioScreen(
                             )
                             if (uiState.selectedOverlay != null) {
                                 Surface(
-                                    shape = MaterialTheme.shapes.medium,
+                                    shape = MaterialTheme.shapes.small,
                                     color = AccentEmerald.copy(alpha = 0.2f),
                                     contentColor = AccentEmerald
                                 ) {
