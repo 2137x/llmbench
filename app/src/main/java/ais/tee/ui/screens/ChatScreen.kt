@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -94,6 +95,9 @@ internal fun chatMessageContentType(message: ModelChatMessage): String = when {
     message.isError -> "error"
     else -> "assistant"
 }
+
+internal fun chatBubbleMaxWidth(containerWidth: Dp): Dp =
+    (containerWidth - 32.dp).coerceIn(340.dp, 640.dp)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -646,7 +650,8 @@ fun ChatScreen(
         },
         modifier = modifier.fillMaxSize()
     ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val maxBubbleWidth = chatBubbleMaxWidth(maxWidth)
             LazyColumn(
                 state = listState,
                 contentPadding = PaddingValues(
@@ -667,6 +672,7 @@ fun ChatScreen(
                 ) { message ->
                     ChatMessageItem(
                         message = message,
+                        maxBubbleWidth = maxBubbleWidth,
                         canOpenMarkdown = canOpenResponseAsMarkdown(
                             message = message,
                             isPreparingChatMarkdown = isPreparingChatMarkdown,
@@ -926,6 +932,7 @@ private fun NativeConversationsDialog(
 @Composable
 fun ChatMessageItem(
     message: ModelChatMessage,
+    maxBubbleWidth: Dp,
     canOpenMarkdown: Boolean,
     onCopyText: (String) -> Unit,
     onOpenMarkdown: (ModelChatMessage) -> Unit,
@@ -1028,7 +1035,7 @@ fun ChatMessageItem(
             border = if (!isUser) {
                 BorderStroke(1.dp, providerColor.copy(alpha = 0.25f))
             } else null,
-            modifier = Modifier.widthIn(max = 340.dp)
+            modifier = Modifier.widthIn(max = maxBubbleWidth)
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
                 Text(
