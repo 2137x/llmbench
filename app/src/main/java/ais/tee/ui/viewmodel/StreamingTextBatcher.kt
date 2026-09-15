@@ -18,6 +18,10 @@ internal class StreamingTextBatcher {
     private val lock = Any()
     private val pending = linkedMapOf<StreamingTextTarget, StringBuilder>()
 
+    fun <T> withExclusiveAccess(block: () -> T): T = synchronized(lock) {
+        block()
+    }
+
     fun append(target: StreamingTextTarget, delta: String) {
         if (delta.isEmpty()) return
         synchronized(lock) {
