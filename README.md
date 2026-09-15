@@ -149,4 +149,3 @@ Mobile UX is a product constraint: long chats must stay responsive, file upload 
 ## License
 
 ISC, see [LICENSE](LICENSE).
-
