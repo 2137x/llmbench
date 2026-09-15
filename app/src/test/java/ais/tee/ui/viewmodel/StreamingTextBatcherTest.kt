@@ -1,6 +1,9 @@
 package ais.tee.ui.viewmodel
 
 import ais.tee.data.model.AiProvider
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -71,5 +74,35 @@ class StreamingTextBatcherTest {
 
         assertFalse(batcher.hasPendingGeneration(7L))
         assertTrue(batcher.drainGeneration(7L).isEmpty())
+    }
+
+    @Test
+    fun exclusiveAccessSerializesStreamingStateTransitions() {
+        val batcher = StreamingTextBatcher()
+        val firstEntered = CountDownLatch(1)
+        val releaseFirst = CountDownLatch(1)
+        val secondEntered = CountDownLatch(1)
+
+        val first = thread(start = true) {
+            batcher.withExclusiveAccess {
+                firstEntered.countDown()
+                releaseFirst.await(2, TimeUnit.SECONDS)
+            }
+        }
+        assertTrue(firstEntered.await(2, TimeUnit.SECONDS))
+
+        val second = thread(start = true) {
+            batcher.withExclusiveAccess {
+                secondEntered.countDown()
+            }
+        }
+        assertFalse(secondEntered.await(100, TimeUnit.MILLISECONDS))
+
+        releaseFirst.countDown()
+        assertTrue(secondEntered.await(2, TimeUnit.SECONDS))
+        first.join(2_000)
+        second.join(2_000)
+        assertFalse(first.isAlive)
+        assertFalse(second.isAlive)
     }
 }
