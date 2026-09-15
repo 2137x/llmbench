@@ -39,9 +39,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -1230,38 +1227,6 @@ fun WebChatScreen(
             }
         )
     }
-}
-
-@Composable
-private fun rememberWebViewLifecycleStarted(
-    webViewMap: Map<WebAiService, WebView>,
-    selectedService: WebAiService
-): Boolean {
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val currentSelectedService by rememberUpdatedState(selectedService)
-    var lifecycleStarted by remember(lifecycleOwner) {
-        mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
-    }
-
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_START -> {
-                    lifecycleStarted = true
-                    webViewMap[currentSelectedService]?.onResume()
-                }
-                Lifecycle.Event.ON_STOP -> {
-                    lifecycleStarted = false
-                    webViewMap.values.forEach(WebView::onPause)
-                }
-                else -> Unit
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    return lifecycleStarted
 }
 
 @Composable
