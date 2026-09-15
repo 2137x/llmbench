@@ -745,7 +745,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
             targetProvider.usesLiveGatewayModelCatalog() &&
             state.gatewayModelOptions[targetProvider]?.isEmpty() == true
         ) {
-            showSnackbar("No free text models are currently available for ${targetProvider.shortName}.")
+            showSnackbar("No compatible models are currently available for ${targetProvider.shortName}.")
             return null
         }
         val providersToRun = if (targetProvider == AiProvider.ALL) {
