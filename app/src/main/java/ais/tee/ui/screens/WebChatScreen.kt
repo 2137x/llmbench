@@ -31,6 +31,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -82,6 +85,11 @@ private const val RENDERER_INACTIVITY_CONFIRM_DELAY_MS = 500L
 internal fun studioPromptForWebChat(renderedInstructions: String): String? =
     renderedInstructions.takeUnless(String::isBlank)
 
+internal fun webProviderNavigationIsPersistent(type: NavigationSuiteType): Boolean =
+    type == NavigationSuiteType.NavigationRail ||
+        type == NavigationSuiteType.WideNavigationRailCollapsed ||
+        type == NavigationSuiteType.WideNavigationRailExpanded
+
 private data class PendingSharedUploadConfirmation(
     val service: WebAiService,
     val shareId: Long,
@@ -114,6 +122,10 @@ fun WebChatScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val navigationSuiteType = NavigationSuiteScaffoldDefaults.navigationSuiteType(
+        currentWindowAdaptiveInfoV2()
+    )
+    val persistentProviderNavigation = webProviderNavigationIsPersistent(navigationSuiteType)
     val selectedService by rememberUpdatedState(uiState.selectedWebService)
     val currentPendingWebShare by rememberUpdatedState(uiState.pendingWebShare)
     var currentUrl by remember { mutableStateOf(selectedService.url) }
@@ -781,36 +793,42 @@ fun WebChatScreen(
         }
     }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        gesturesEnabled = false,
-        drawerContent = {
-            WebProviderDrawer(
-                selectedService = selectedService,
-                activityStatuses = activityStatuses,
-                providerFavicons = providerFavicons,
-                favoriteServices = uiState.favoriteWebServices,
-                onToggleFavorite = viewModel::toggleFavoriteWebService,
-                onSelectService = { service ->
-                    activateService(service)
-                    drawerScope.launch { drawerState.close() }
-                },
-                onOpenNativeCompare = {
+    val providerDrawerContent: @Composable (Boolean) -> Unit = { persistent ->
+        WebProviderDrawer(
+            persistent = persistent,
+            selectedService = selectedService,
+            activityStatuses = activityStatuses,
+            providerFavicons = providerFavicons,
+            favoriteServices = uiState.favoriteWebServices,
+            onToggleFavorite = viewModel::toggleFavoriteWebService,
+            onSelectService = { service ->
+                activateService(service)
+                if (!persistent) drawerScope.launch { drawerState.close() }
+            },
+            onOpenNativeCompare = {
+                if (persistent) {
+                    onOpenNativeCompare()
+                } else {
                     drawerScope.launch {
                         drawerState.close()
                         onOpenNativeCompare()
                     }
-                },
-                onOpenStudio = {
+                }
+            },
+            onOpenStudio = {
+                if (persistent) {
+                    onOpenStudio()
+                } else {
                     drawerScope.launch {
                         drawerState.close()
                         onOpenStudio()
                     }
-                },
-            )
-        },
-        modifier = modifier.fillMaxSize()
-    ) {
+                }
+            }
+        )
+    }
+
+    val webChatContent: @Composable () -> Unit = {
         Scaffold(
             topBar = {
                 WebChatToolbar(
@@ -824,6 +842,7 @@ fun WebChatScreen(
                     isDesktopMode = isDesktopMode,
                     isLoading = isLoading,
                     loadingProgress = loadingProgress,
+                    showProviderDrawerButton = !persistentProviderNavigation,
                     onOpenDrawer = { drawerScope.launch { drawerState.open() } },
                     onApplyStudio = ::applyStudioPrompt,
                     onShowPromptHelper = { showPromptHelperDialog = true },
@@ -1070,6 +1089,25 @@ fun WebChatScreen(
             }
         }
         }
+
+    }
+
+    if (persistentProviderNavigation) {
+        PermanentNavigationDrawer(
+            drawerContent = { providerDrawerContent(true) },
+            modifier = modifier.fillMaxSize()
+        ) {
+            webChatContent()
+        }
+    } else {
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            gesturesEnabled = false,
+            drawerContent = { providerDrawerContent(false) },
+            modifier = modifier.fillMaxSize()
+        ) {
+            webChatContent()
+        }
     }
 
     // Quick Prompt / Profile Copier Dialog
@@ -1241,6 +1279,7 @@ private fun WebChatToolbar(
     isDesktopMode: Boolean,
     isLoading: Boolean,
     loadingProgress: Int,
+    showProviderDrawerButton: Boolean,
     onOpenDrawer: () -> Unit,
     onApplyStudio: () -> Unit,
     onShowPromptHelper: () -> Unit,
@@ -1269,13 +1308,15 @@ private fun WebChatToolbar(
                     .padding(horizontal = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = onOpenDrawer,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .testTag("btn_web_provider_drawer")
-                ) {
-                    Icon(Icons.Default.Menu, contentDescription = "Switch AI service")
+                if (showProviderDrawerButton) {
+                    IconButton(
+                        onClick = onOpenDrawer,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .testTag("btn_web_provider_drawer")
+                    ) {
+                        Icon(Icons.Default.Menu, contentDescription = "Switch AI service")
+                    }
                 }
 
                 WebProviderIdentityIcon(
@@ -1428,6 +1469,7 @@ private fun WebChatToolbar(
 
 @Composable
 private fun WebProviderDrawer(
+    persistent: Boolean,
     selectedService: WebAiService,
     activityStatuses: Map<WebAiService, WebChatActivityStatus>,
     providerFavicons: Map<WebAiService, Bitmap>,
@@ -1438,7 +1480,7 @@ private fun WebProviderDrawer(
     onOpenStudio: () -> Unit
 ) {
     val sections = webChatSections(favoriteServices)
-    ModalDrawerSheet(modifier = Modifier.width(292.dp)) {
+    val drawerContent: @Composable () -> Unit = {
         Column(
             modifier = Modifier
                 .fillMaxHeight()
@@ -1533,6 +1575,15 @@ private fun WebProviderDrawer(
                     .padding(horizontal = 12.dp)
                     .testTag("btn_switch_to_studio")
             )
+        }
+    }
+    if (persistent) {
+        PermanentDrawerSheet(modifier = Modifier.width(292.dp)) {
+            drawerContent()
+        }
+    } else {
+        ModalDrawerSheet(modifier = Modifier.width(292.dp)) {
+            drawerContent()
         }
     }
 }
