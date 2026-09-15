@@ -11,7 +11,7 @@ import ais.tee.data.model.GatewayModelCatalogEntry
 import ais.tee.data.model.ModelChatMessage
 import ais.tee.data.model.ProviderUsage
 import ais.tee.data.model.buildBoundedProviderTextTurns
-import ais.tee.data.model.freeGatewayModelOptions
+import ais.tee.data.model.gatewayModelOptions
 import ais.tee.data.model.Profile
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CancellationException
@@ -208,7 +208,7 @@ class AiChatService {
         ConcurrentHashMap<ClaudeMetadataCacheKey, ClaudeMetadataCacheEntry>()
     private val claudeMetadataMutex = Mutex()
 
-    suspend fun fetchFreeGatewayModels(
+    suspend fun fetchGatewayModels(
         provider: AiProvider,
         apiKeys: ApiKeyConfig
     ): List<String> = withContext(Dispatchers.IO) {
@@ -222,6 +222,7 @@ class AiChatService {
         val apiKey = when (provider) {
             AiProvider.OPENROUTER -> apiKeys.openRouterKey
             AiProvider.AIHUBMIX -> apiKeys.aiHubMixKey
+            AiProvider.VERCEL -> apiKeys.vercelAiGatewayKey
             else -> ""
         }.trim()
         if (apiKey.isNotBlank()) {
@@ -233,7 +234,7 @@ class AiChatService {
             request = requestBuilder.build(),
             httpErrorContext = "${provider.shortName} model catalog"
         )
-        freeGatewayModelOptions(provider, parseGatewayModelCatalog(provider, responseBody))
+        gatewayModelOptions(provider, parseGatewayModelCatalog(provider, responseBody))
     }
 
     internal fun parseGatewayModelCatalog(
@@ -267,6 +268,23 @@ class AiChatService {
                         inputPriceUsd = pricing?.get(JSON_INPUT_KEY).asDoubleOrNull(),
                         outputPriceUsd = pricing?.get(JSON_OUTPUT_KEY).asDoubleOrNull(),
                         supportsTextOutput = model["types"]?.jsonPrimitive?.contentOrNull?.equals("llm", ignoreCase = true) == true
+                    )
+                }
+                AiProvider.VERCEL -> {
+                    val id = model[JSON_MODEL_ID_KEY]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+                    val pricing = model[JSON_PRICING_KEY]?.jsonObject
+                    val outputModalities = (model["modalities"] as? JsonObject)
+                        ?.get(JSON_OUTPUT_KEY) as? JsonArray
+                    val supportsText = outputModalities
+                        ?.any { it.jsonPrimitive.contentOrNull == JSON_TEXT_KEY }
+                        ?: true
+                    GatewayModelCatalogEntry(
+                        id = id,
+                        inputPriceUsd = pricing?.get(JSON_INPUT_KEY).asDoubleOrNull(),
+                        outputPriceUsd = pricing?.get(JSON_OUTPUT_KEY).asDoubleOrNull(),
+                        supportsTextOutput =
+                            model["type"]?.jsonPrimitive?.contentOrNull?.equals("language", ignoreCase = true) == true &&
+                                supportsText
                     )
                 }
                 else -> return@mapNotNull null
@@ -360,6 +378,7 @@ class AiChatService {
             AiProvider.KIMI -> Pair(apiKeys.kimiKey.trim(), apiKeys.kimiKey.isNotBlank())
             AiProvider.OPENROUTER -> Pair(apiKeys.openRouterKey.trim(), apiKeys.openRouterKey.isNotBlank())
             AiProvider.AIHUBMIX -> Pair(apiKeys.aiHubMixKey.trim(), apiKeys.aiHubMixKey.isNotBlank())
+            AiProvider.VERCEL -> Pair(apiKeys.vercelAiGatewayKey.trim(), apiKeys.vercelAiGatewayKey.isNotBlank())
             AiProvider.ALL -> Pair("", false)
         }
 
@@ -405,7 +424,7 @@ class AiChatService {
                         providerUsage = result.usage
                         result.text
                     }
-                    AiProvider.DEEPSEEK, AiProvider.KIMI, AiProvider.OPENROUTER, AiProvider.AIHUBMIX -> {
+                    AiProvider.DEEPSEEK, AiProvider.KIMI, AiProvider.OPENROUTER, AiProvider.AIHUBMIX, AiProvider.VERCEL -> {
                         val config = checkNotNull(OpenAiCompatibleProtocol.configFor(provider))
                         val result = if (onTextDelta != null) {
                             callOpenAiCompatibleStreamApi(
@@ -1975,6 +1994,10 @@ class AiChatService {
 
             AiProvider.AIHUBMIX -> {
                 "**AIHubMix ($model)**: Free-gateway simulation for '$prompt'. Add an AIHubMix key to use a live subsidized `-free` model while keeping gateway traffic outside the default multi-provider compare."
+            }
+
+            AiProvider.VERCEL -> {
+                "**Vercel AI Gateway ($model)**: Gateway simulation for '$prompt'. Add a Vercel AI Gateway key to use the live model catalog while keeping gateway traffic outside the default multi-provider compare."
             }
 
             AiProvider.ALL -> "Multi-provider dispatch."

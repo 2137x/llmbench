@@ -543,6 +543,36 @@ class AiChatServiceTest {
         assertFalse(entries.last().supportsTextOutput)
     }
     @Test
+    fun parsesVercelCatalogPricingAndLanguageType() {
+        val raw = """
+            {
+              "data": [
+                {
+                  "id": "vendor/text-model",
+                  "type": "language",
+                  "modalities": {"output": ["text"]},
+                  "pricing": {"input": "0.0000001", "output": "0.0000002"}
+                },
+                {
+                  "id": "vendor/image-model",
+                  "type": "image",
+                  "modalities": {"output": ["image"]},
+                  "pricing": {"input": "0", "output": "0"}
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val entries = AiChatService().parseGatewayModelCatalog(AiProvider.VERCEL, raw)
+
+        assertEquals(2, entries.size)
+        assertEquals("vendor/text-model", entries.first().id)
+        assertEquals(0.0000001, entries.first().inputPriceUsd ?: -1.0, 0.0)
+        assertTrue(entries.first().supportsTextOutput)
+        assertFalse(entries.last().supportsTextOutput)
+    }
+
+    @Test
     fun geminiHistoryReplaysOpaqueModelContentsIncludingSignatureOnlyChunk() {
         val replayState = "[{\"role\":\"model\",\"parts\":[{\"text\":\"gemini answer\"}]},{\"role\":\"model\",\"parts\":[{\"text\":\"\",\"thoughtSignature\":\"opaque-signature\"}]}]"
         val history = listOf(

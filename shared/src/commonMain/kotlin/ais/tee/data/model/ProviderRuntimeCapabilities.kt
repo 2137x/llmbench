@@ -121,7 +121,8 @@ fun AiProvider.runtimeCapabilities(): ProviderRuntimeCapabilities = when (this) 
     AiProvider.DEEPSEEK,
     AiProvider.KIMI,
     AiProvider.OPENROUTER,
-    AiProvider.AIHUBMIX -> ProviderRuntimeCapabilities(
+    AiProvider.AIHUBMIX,
+    AiProvider.VERCEL -> ProviderRuntimeCapabilities(
         transport = NativeChatTransport.OPENAI_COMPATIBLE_CHAT_COMPLETIONS,
         systemInstructionPlacement = SystemInstructionPlacement.SYSTEM_MESSAGE,
         conversationStateStrategy = ConversationStateStrategy.BOUNDED_PROVIDER_TEXT_REPLAY,

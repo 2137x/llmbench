@@ -13,7 +13,7 @@ Rolling Android build: [download the signed APK](https://github.com/travnie/aist
 Aistee is intended to combine three layers:
 
 1. **Web accounts** — persistent WebView tabs for services where the user signs in with their normal account.
-2. **Free/native providers** — a shared chat/compare surface for API-compatible free providers such as OpenRouter-style endpoints.
+2. **Native/API providers** — a shared chat/compare surface for direct APIs and OpenAI-compatible gateways such as OpenRouter, AIHubMix and Vercel AI Gateway.
 3. **Optional AI tooling** — reusable profiles/instructions from [`trvny/.ai`](https://github.com/trvny/.ai) without copying that repository into this one.
 
 The first prototype already contains Compose UI, persistent per-provider WebViews, a native comparison chat, profile/instruction rendering, YAML editing and a small skills/docs browser.
@@ -37,9 +37,9 @@ On Android, Aistee also appears in the system share sheet for text, images and a
 - Character.AI
 - Venice
 - Meta AI
-### Native / free-provider layer
+### Native / API layer
 
-The native/free-provider layer supports OpenRouter Free and AIHubMix through the shared OpenAI-compatible gateway adapter. Direct Gemini, OpenAI and Claude chats preserve bounded provider-scoped history with native message roles and stream text incrementally with cancellable requests; interrupted partial replies are never replayed. Their model pickers refresh from each gateway's live catalog and keep only zero-cost text models, with bundled models as an offline fallback. Both gateways stay outside the default All Models comparison to avoid duplicate aggregator routing. All Models dispatches only to direct providers with configured API keys and reports API failures without substituting simulated answers. Provider-specific details belong behind adapters rather than being spread through UI code.
+The native/API layer supports OpenRouter Free, AIHubMix and Vercel AI Gateway through the shared OpenAI-compatible gateway adapter. Direct Gemini, OpenAI and Claude chats preserve bounded provider-scoped history with native message roles and stream text incrementally with cancellable requests; interrupted partial replies are never replayed. Gateway model pickers refresh from each live catalog: OpenRouter and AIHubMix keep only zero-cost text models, while Vercel exposes compatible text models ordered by listed token price so account credits and configured Vercel budgets remain the spend boundary. Gateways stay outside the default All Models comparison to avoid duplicate aggregator routing. All Models dispatches only to direct providers with configured API keys and reports API failures without substituting simulated answers. Provider-specific details belong behind adapters rather than being spread through UI code.
 
 ## Provider support matrix
 
@@ -62,6 +62,7 @@ Full means the Aistee-side integration is implemented; provider-side login or pa
 | Meta AI Web | Partial | Meta login surface is provider-owned | Not verified | Not yet | `alpha.meta.ai` is a verified provider-owned login alias; embedded sign-in, chat uploads and activity tracking still need verification |
 | OpenRouter Free | Native gateway | API key | N/A | Native request state | Uses openrouter/free; excluded from default All Models compare |
 | AIHubMix Free | Native gateway | API key | N/A | Native request state | Uses explicit -free models; excluded from default All Models compare |
+| Vercel AI Gateway | Native gateway | API key | N/A | Native request state | Live text-model catalog ordered by listed price; spend remains bounded by the Vercel account/key budgets |
 
 Verification references for the newer web providers: [Microsoft Copilot entry points](https://learn.microsoft.com/microsoft-365/copilot/microsoft-365-copilot-overview), [Microsoft Copilot file upload](https://support.microsoft.com/en-us/microsoft-copilot/file-upload-in-microsoft-copilot), [Grok files FAQ](https://docs.x.ai/grok/faq), [Venice upload changelog](https://featurebase.venice.ai/changelog/veniceai-change-log-march-1st-3rd-2025), [Character.AI image attachments](https://support.character.ai/hc/en-us/articles/35409588582683-Community-Update-March-2025), [Qwen VLo image upload in Qwen Chat](https://qwen.ai/blog?id=qwen-vlo), the provider-owned [Qwen sign-in surface](https://chat.qwen.ai/auth?action=signin), the provider-owned [Z.ai sign-in surface](https://chat.z.ai/auth), and the provider-owned [Meta AI login surface](https://alpha.meta.ai/). These verify provider capabilities or owned hosts, not Android WebView login compatibility or stable generation DOM selectors.
 
@@ -122,7 +123,7 @@ Backends are optional, not the default. If a feature truly needs one, prefer a t
 - [x] add mobile WebView LRU/memory-pressure handling for long chats
 - [x] implement reliable provider file uploads through the platform file picker
 - [x] apply rendered Studio instructions to an empty focused web composer with clipboard fallback
-- [x] add AIHubMix and OpenRouter-compatible free-provider gateways
+- [x] add OpenRouter, AIHubMix and Vercel OpenAI-compatible gateways
 - [x] create a provider-tweak/userscript interface instead of hard-coded WebView hacks
 - [x] add privacy-safe provider diagnostics for embedded capability verification
 - [x] show generating and unread response status on ChatGPT, Claude, Gemini, DeepSeek, Kimi and Vibe web tabs
@@ -148,3 +149,4 @@ Mobile UX is a product constraint: long chats must stay responsive, file upload 
 ## License
 
 ISC, see [LICENSE](LICENSE).
+
