@@ -108,7 +108,7 @@ fun PlaygroundScreen(
                     ) {
                         items(samplePrompts) { prompt ->
                             Surface(
-                                shape = RoundedCornerShape(12.dp),
+                                shape = MaterialTheme.shapes.medium,
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                                 modifier = Modifier
                                     .clickable {
@@ -138,7 +138,7 @@ fun PlaygroundScreen(
                             onValueChange = { inputText = it },
                             placeholder = { Text("Ask a question to test style adaptation...", fontSize = 13.sp) },
                             singleLine = true,
-                            shape = RoundedCornerShape(24.dp),
+                            shape = MaterialTheme.shapes.extraLarge,
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("input_prompt_text")
@@ -233,7 +233,7 @@ fun PlaygroundScreen(
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
+                                        .clip(MaterialTheme.shapes.small)
                                         .background(MaterialTheme.colorScheme.background.copy(alpha = 0.5f))
                                         .padding(6.dp)
                                 ) {
