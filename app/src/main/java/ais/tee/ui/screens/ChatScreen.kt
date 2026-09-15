@@ -482,7 +482,7 @@ fun ChatScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(MaterialTheme.shapes.small)
                                 .clickable { showModelMenu = true }
                                 .padding(horizontal = 4.dp, vertical = 2.dp)
                         ) {
@@ -563,7 +563,7 @@ fun ChatScreen(
                     ) {
                         items(samplePrompts) { prompt ->
                             Surface(
-                                shape = RoundedCornerShape(12.dp),
+                                shape = MaterialTheme.shapes.medium,
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                                 modifier = Modifier
                                     .clickable {
@@ -609,7 +609,7 @@ fun ChatScreen(
                                 )
                             },
                             maxLines = 4,
-                            shape = RoundedCornerShape(24.dp),
+                            shape = MaterialTheme.shapes.extraLarge,
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("chat_input_field")
@@ -842,7 +842,7 @@ private fun NativeConversationsDialog(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Surface(
-                                shape = RoundedCornerShape(12.dp),
+                                shape = MaterialTheme.shapes.medium,
                                 color = if (isActive) {
                                     MaterialTheme.colorScheme.secondaryContainer
                                 } else {
@@ -975,7 +975,7 @@ fun ChatMessageItem(
                 }
                 if (message.isSimulated) {
                     Surface(
-                        shape = RoundedCornerShape(4.dp),
+                        shape = MaterialTheme.shapes.extraSmall,
                         color = MaterialTheme.colorScheme.tertiaryContainer,
                         modifier = Modifier.testTag("badge_simulated_${message.id}")
                     ) {
@@ -1059,7 +1059,7 @@ fun ChatMessageItem(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(MaterialTheme.shapes.small)
                             .background(MaterialTheme.colorScheme.background.copy(alpha = 0.5f))
                             .padding(8.dp)
                     ) {
@@ -1132,7 +1132,7 @@ fun GeneratingIndicator(activeProviders: Set<AiProvider>) {
         horizontalAlignment = Alignment.Start
     ) {
         Card(
-            shape = RoundedCornerShape(16.dp),
+            shape = MaterialTheme.shapes.medium,
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             )
