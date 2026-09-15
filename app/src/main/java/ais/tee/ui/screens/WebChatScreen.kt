@@ -30,7 +30,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -1916,9 +1915,9 @@ private fun WebProviderDrawer(
         ) {
             Text(
                 text = "Chats",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 10.dp)
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 12.dp)
             )
 
             if (sections.favorites.isNotEmpty()) {
@@ -1979,6 +1978,7 @@ private fun WebProviderDrawer(
                 label = { Text("Compare Hub") },
                 selected = false,
                 onClick = onOpenNativeCompare,
+                shape = MaterialTheme.shapes.medium,
                 icon = {
                     Icon(
                         Icons.Default.CompareArrows,
@@ -1994,6 +1994,7 @@ private fun WebProviderDrawer(
                 label = { Text("Studio") },
                 selected = false,
                 onClick = onOpenStudio,
+                shape = MaterialTheme.shapes.medium,
                 icon = {
                     Icon(Icons.Default.Tune, contentDescription = null)
                 },
@@ -2025,6 +2026,7 @@ private fun WebProviderDrawerItem(
         },
         selected = isSelected,
         onClick = onSelect,
+        shape = MaterialTheme.shapes.medium,
         icon = {
             WebProviderIdentityIcon(
                 service = service,
@@ -2087,7 +2089,7 @@ private fun WebProviderIdentityIcon(
             contentDescription = null,
             modifier = Modifier
                 .size(size)
-                .clip(RoundedCornerShape(5.dp))
+                .clip(MaterialTheme.shapes.extraSmall)
         )
     } else {
         Icon(
