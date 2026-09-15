@@ -8,7 +8,6 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -192,7 +191,7 @@ private fun YamlValidationCard(uiState: StudioUiState) {
     val isValid = uiState.validationResult.isValid
     val accent = if (isValid) AccentEmerald else AccentRose
     Card(
-        shape = RoundedCornerShape(14.dp),
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.15f)),
         border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.4f)),
         modifier = Modifier.fillMaxWidth()
@@ -235,7 +234,7 @@ private fun YamlLayerTabs(selectedIndex: Int, onSelected: (Int) -> Unit) {
         selectedTabIndex = selectedIndex,
         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
         contentColor = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.clip(RoundedCornerShape(12.dp))
+        modifier = Modifier.clip(MaterialTheme.shapes.medium)
     ) {
         YamlDocumentTab.entries.forEachIndexed { index, tab ->
             Tab(
@@ -250,7 +249,7 @@ private fun YamlLayerTabs(selectedIndex: Int, onSelected: (Int) -> Unit) {
 @Composable
 private fun YamlDocumentCard(tab: YamlDocumentTab, yamlText: String) {
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(2.dp),
         modifier = Modifier.fillMaxWidth()
@@ -267,7 +266,7 @@ private fun YamlDocumentCard(tab: YamlDocumentTab, yamlText: String) {
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
-                Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                Surface(shape = MaterialTheme.shapes.extraSmall, color = MaterialTheme.colorScheme.surfaceVariant) {
                     Text(
                         text = tab.languageLabel,
                         style = MaterialTheme.typography.labelSmall,
@@ -281,7 +280,7 @@ private fun YamlDocumentCard(tab: YamlDocumentTab, yamlText: String) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(MaterialTheme.shapes.small)
                     .background(MaterialTheme.colorScheme.background)
                     .horizontalScroll(rememberScrollState())
                     .padding(12.dp)
