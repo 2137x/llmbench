@@ -20,7 +20,7 @@ class StreamingTextBatcherTest {
         val openAiTarget = StreamingTextTarget(
             generationId = 7L,
             messageId = "stream-user-openai",
-            provider = AiProvider.OPENAI,
+            provider = AiProvider.CHATGPT,
             model = "openai-test"
         )
 
