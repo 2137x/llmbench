@@ -25,7 +25,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.shape.RoundedCornerShape
 import ais.tee.data.codebench.CodebenchBarcodeFormat
 import ais.tee.data.codebench.CodebenchBarcodeGenerateAction
 import ais.tee.data.codebench.CodebenchBarcodeGenerateActionResult
@@ -1080,7 +1079,7 @@ private fun CodebenchBarcodePreview(matrix: CodebenchBarcodeMatrix) {
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(matrix.width.toFloat() / matrix.height)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(MaterialTheme.shapes.small)
             .background(Color.White)
             .testTag("codebench_preview")
     ) {
