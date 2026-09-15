@@ -11,7 +11,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -191,7 +190,7 @@ fun SkillsBrowserScreen(
                         }
                     } else null,
                     singleLine = true,
-                    shape = RoundedCornerShape(16.dp),
+                    shape = MaterialTheme.shapes.large,
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("search_skills_field")
@@ -203,7 +202,7 @@ fun SkillsBrowserScreen(
                     selectedTabIndex = selectedCategoryTab,
                     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                     contentColor = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clip(RoundedCornerShape(12.dp))
+                    modifier = Modifier.clip(MaterialTheme.shapes.medium)
                 ) {
                     Tab(
                         selected = selectedCategoryTab == 0,
@@ -258,7 +257,7 @@ fun SkillsBrowserScreen(
                     }
                     items(filtered) { skill ->
                         Card(
-                            shape = RoundedCornerShape(14.dp),
+                            shape = MaterialTheme.shapes.medium,
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surface
                             ),
@@ -281,7 +280,7 @@ fun SkillsBrowserScreen(
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Surface(
-                                        shape = RoundedCornerShape(8.dp),
+                                        shape = MaterialTheme.shapes.small,
                                         color = MaterialTheme.colorScheme.primaryContainer
                                     ) {
                                         Text(
@@ -327,7 +326,7 @@ fun SkillsBrowserScreen(
                     }
                     items(filtered) { inst ->
                         Card(
-                            shape = RoundedCornerShape(14.dp),
+                            shape = MaterialTheme.shapes.medium,
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surface
                             ),
@@ -349,7 +348,7 @@ fun SkillsBrowserScreen(
                                         fontWeight = FontWeight.Bold
                                     )
                                     Surface(
-                                        shape = RoundedCornerShape(8.dp),
+                                        shape = MaterialTheme.shapes.small,
                                         color = MaterialTheme.colorScheme.secondaryContainer
                                     ) {
                                         Text(
@@ -375,7 +374,7 @@ fun SkillsBrowserScreen(
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
+                                        .clip(MaterialTheme.shapes.small)
                                         .background(MaterialTheme.colorScheme.background)
                                         .padding(8.dp)
                                 )
@@ -391,7 +390,7 @@ fun SkillsBrowserScreen(
                     }
                     items(filtered) { tmpl ->
                         Card(
-                            shape = RoundedCornerShape(14.dp),
+                            shape = MaterialTheme.shapes.medium,
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surface
                             ),
@@ -415,7 +414,7 @@ fun SkillsBrowserScreen(
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                     Surface(
-                                        shape = RoundedCornerShape(8.dp),
+                                        shape = MaterialTheme.shapes.small,
                                         color = MaterialTheme.colorScheme.tertiaryContainer
                                     ) {
                                         Text(
@@ -462,7 +461,7 @@ fun SkillsBrowserScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 360.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(MaterialTheme.shapes.small)
                         .background(MaterialTheme.colorScheme.background)
                         .padding(12.dp)
                 ) {
@@ -601,7 +600,7 @@ private fun LocalSkillPreviewCard(
     onPreview: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(14.dp),
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
         ),
@@ -779,7 +778,7 @@ private fun SkillImportPreviewDialog(
                         fontFamily = FontFamily.Monospace,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(MaterialTheme.shapes.small)
                             .background(MaterialTheme.colorScheme.background)
                             .padding(10.dp)
                     )
