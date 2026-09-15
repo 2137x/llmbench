@@ -250,6 +250,15 @@ enum class AiProvider(
         ),
         description = "AIHubMix gateway for subsidized zero-cost model variants",
         participatesInDefaultCompare = false
+    ),
+    VERCEL(
+        id = "vercel",
+        displayName = "Vercel AI Gateway",
+        shortName = "Vercel",
+        defaultModel = "alibaba/qwen3-coder-30b-a3b",
+        availableModels = listOf("alibaba/qwen3-coder-30b-a3b"),
+        description = "Vercel AI Gateway with a live text-model catalog and account budget controls",
+        participatesInDefaultCompare = false
     );
 
     companion object {
@@ -271,7 +280,8 @@ data class ApiKeyConfig(
     val deepseekKey: String = "",
     val kimiKey: String = "",
     val openRouterKey: String = "",
-    val aiHubMixKey: String = ""
+    val aiHubMixKey: String = "",
+    val vercelAiGatewayKey: String = ""
 ) {
     /** API credentials must never appear in logs, crash breadcrumbs or debugger stringification. */
     override fun toString(): String = "ApiKeyConfig(<redacted>)"
@@ -285,6 +295,7 @@ fun ApiKeyConfig.hasKeyFor(provider: AiProvider): Boolean = when (provider) {
     AiProvider.KIMI -> kimiKey.isNotBlank()
     AiProvider.OPENROUTER -> openRouterKey.isNotBlank()
     AiProvider.AIHUBMIX -> aiHubMixKey.isNotBlank()
+    AiProvider.VERCEL -> vercelAiGatewayKey.isNotBlank()
     AiProvider.ALL -> false
 }
 
@@ -298,27 +309,35 @@ data class GatewayModelCatalogEntry(
     val supportsTextOutput: Boolean
 )
 
-fun AiProvider.usesLiveFreeModelCatalog(): Boolean =
-    this == AiProvider.OPENROUTER || this == AiProvider.AIHUBMIX
+fun AiProvider.usesLiveGatewayModelCatalog(): Boolean =
+    this == AiProvider.OPENROUTER || this == AiProvider.AIHUBMIX || this == AiProvider.VERCEL
 
-fun freeGatewayModelOptions(
+fun gatewayModelOptions(
     provider: AiProvider,
     catalog: List<GatewayModelCatalogEntry>
 ): List<String> {
-    if (!provider.usesLiveFreeModelCatalog()) return provider.availableModels
+    if (!provider.usesLiveGatewayModelCatalog()) return provider.availableModels
 
-    val liveFreeModels = catalog.asSequence()
-        .filter { entry ->
-            entry.supportsTextOutput &&
-                entry.inputPriceUsd == 0.0 &&
-                entry.outputPriceUsd == 0.0
+    val textModels = catalog.asSequence()
+        .filter { it.supportsTextOutput }
+        .filter { it.id.isNotBlank() }
+        .distinctBy { it.id.trim() }
+
+    val eligibleModels = if (provider == AiProvider.VERCEL) {
+        textModels.sortedWith(
+            compareBy<GatewayModelCatalogEntry> { entry ->
+                val input = entry.inputPriceUsd ?: Double.POSITIVE_INFINITY
+                val output = entry.outputPriceUsd ?: Double.POSITIVE_INFINITY
+                input + output
+            }.thenBy { it.id }
+        )
+    } else {
+        textModels.filter { entry ->
+            entry.inputPriceUsd == 0.0 && entry.outputPriceUsd == 0.0
         }
-        .map { it.id.trim() }
-        .filter { it.isNotEmpty() }
-        .distinct()
-        .toList()
+    }
 
-    return liveFreeModels
+    return eligibleModels.map { it.id.trim() }.toList()
 }
 
 @Serializable

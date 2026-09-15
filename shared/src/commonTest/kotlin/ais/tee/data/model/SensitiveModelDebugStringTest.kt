@@ -14,7 +14,8 @@ class SensitiveModelDebugStringTest {
             "deepseek-secret-demo",
             "kimi-secret-demo",
             "openrouter-secret-demo",
-            "aihubmix-secret-demo"
+            "aihubmix-secret-demo",
+            "vercel-secret-demo"
         )
         val config = ApiKeyConfig(
             geminiKey = secrets[0],
@@ -23,7 +24,8 @@ class SensitiveModelDebugStringTest {
             deepseekKey = secrets[3],
             kimiKey = secrets[4],
             openRouterKey = secrets[5],
-            aiHubMixKey = secrets[6]
+            aiHubMixKey = secrets[6],
+            vercelAiGatewayKey = secrets[7]
         )
 
         val debug = config.toString()

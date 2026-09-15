@@ -28,7 +28,8 @@ class ProviderRuntimeCapabilitiesTest {
             AiProvider.DEEPSEEK,
             AiProvider.KIMI,
             AiProvider.OPENROUTER,
-            AiProvider.AIHUBMIX
+            AiProvider.AIHUBMIX,
+            AiProvider.VERCEL
         ).forEach { provider ->
             val capabilities = provider.runtimeCapabilities()
             assertEquals(

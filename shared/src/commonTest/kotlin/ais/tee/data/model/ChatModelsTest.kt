@@ -80,6 +80,7 @@ class ChatModelsTest {
         assertFalse(AiProvider.ALL in AiProvider.concreteProviders)
         assertFalse(AiProvider.OPENROUTER in AiProvider.concreteProviders)
         assertFalse(AiProvider.AIHUBMIX in AiProvider.concreteProviders)
+        assertFalse(AiProvider.VERCEL in AiProvider.concreteProviders)
         assertEquals(
             setOf(
                 AiProvider.CLAUDE,
@@ -105,6 +106,12 @@ class ChatModelsTest {
     }
 
     @Test
+    fun vercelDefaultsToSmokeTestedGatewayModel() {
+        assertEquals("alibaba/qwen3-coder-30b-a3b", AiProvider.VERCEL.defaultModel)
+        assertTrue(AiProvider.VERCEL.defaultModel in AiProvider.VERCEL.availableModels)
+    }
+
+    @Test
     fun configuredDirectProvidersIncludeOnlyKeyedDirectProviders() {
         val config = ApiKeyConfig(
             geminiKey = "   ",
@@ -120,7 +127,7 @@ class ChatModelsTest {
     }
 
     @Test
-    fun liveGatewayCatalogKeepsOnlyFreeTextModels() {
+    fun freeGatewayCatalogsKeepOnlyFreeTextModels() {
         val catalog = listOf(
             GatewayModelCatalogEntry("free-a", 0.0, 0.0, supportsTextOutput = true),
             GatewayModelCatalogEntry("paid", 0.0, 0.1, supportsTextOutput = true),
@@ -131,11 +138,26 @@ class ChatModelsTest {
 
         assertEquals(
             listOf("free-a", "free-b"),
-            freeGatewayModelOptions(AiProvider.OPENROUTER, catalog)
+            gatewayModelOptions(AiProvider.OPENROUTER, catalog)
         )
         assertEquals(
             listOf("free-a", "free-b"),
-            freeGatewayModelOptions(AiProvider.AIHUBMIX, catalog)
+            gatewayModelOptions(AiProvider.AIHUBMIX, catalog)
+        )
+    }
+
+    @Test
+    fun vercelGatewayCatalogKeepsTextModelsAndSortsCheapestFirst() {
+        val catalog = listOf(
+            GatewayModelCatalogEntry("vendor/expensive", 0.000002, 0.000006, supportsTextOutput = true),
+            GatewayModelCatalogEntry("vendor/image", 0.0, 0.0, supportsTextOutput = false),
+            GatewayModelCatalogEntry("vendor/cheap", 0.0000001, 0.0000002, supportsTextOutput = true),
+            GatewayModelCatalogEntry("vendor/unknown-price", null, null, supportsTextOutput = true)
+        )
+
+        assertEquals(
+            listOf("vendor/cheap", "vendor/expensive", "vendor/unknown-price"),
+            gatewayModelOptions(AiProvider.VERCEL, catalog)
         )
     }
 
@@ -143,7 +165,7 @@ class ChatModelsTest {
     fun successfulEmptyLiveGatewayCatalogStaysEmpty() {
         assertEquals(
             emptyList<String>(),
-            freeGatewayModelOptions(AiProvider.AIHUBMIX, emptyList())
+            gatewayModelOptions(AiProvider.AIHUBMIX, emptyList())
         )
     }
 
@@ -151,11 +173,13 @@ class ChatModelsTest {
     fun gatewayKeysDoNotMakeDefaultCompareConfigured() {
         val config = ApiKeyConfig(
             openRouterKey = "sk-or-v1-gateway",
-            aiHubMixKey = "gateway-key"
+            aiHubMixKey = "gateway-key",
+            vercelAiGatewayKey = "vercel-gateway-key"
         )
 
         assertTrue(config.hasKeyFor(AiProvider.OPENROUTER))
         assertTrue(config.hasKeyFor(AiProvider.AIHUBMIX))
+        assertTrue(config.hasKeyFor(AiProvider.VERCEL))
         assertFalse(config.hasKeyFor(AiProvider.ALL))
         assertTrue(config.configuredDirectProviders().isEmpty())
     }

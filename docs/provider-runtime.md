@@ -21,6 +21,7 @@ Portable provider/model/profile data lives in `shared`. Android currently owns H
 | Kimi | OpenAI-compatible chat completions | `system` message | SSE | bounded visible text replay |
 | OpenRouter | OpenAI-compatible chat completions | `system` message | SSE | bounded visible text replay |
 | AIHubMix | OpenAI-compatible chat completions | `system` message | SSE | bounded visible text replay |
+| Vercel AI Gateway | OpenAI-compatible chat completions | `system` message | SSE | bounded visible text replay |
 
 Generation and gateway model-catalog requests are coroutine-cancellable: cancelling their coroutine cancels the underlying OkHttp call. SSE parsing is shared, accepts multi-line `data:` events, propagates provider error events, and stops at provider completion or `[DONE]` where applicable.
 
@@ -79,7 +80,7 @@ The current native path does not expose client tools, so streaming replay only m
 
 ### Gateways
 
-OpenRouter and other OpenAI-compatible gateways may return the model actually used. Aistee captures that response metadata when present and falls back to the requested model/route otherwise, so aliases such as `openrouter/free` can show the actual responder.
+OpenRouter and other OpenAI-compatible gateways may return the model actually used. Aistee captures that response metadata when present and falls back to the requested model/route otherwise, so aliases such as `openrouter/free` can show the actual responder. Vercel AI Gateway uses the same transport path and refreshes its `/v1/models` catalog, retaining text-capable language models ordered by listed input/output token price; Vercel account and API-key budgets remain the authoritative spend controls.
 
 ## Usage and comparison metadata
 
@@ -126,5 +127,6 @@ Costs are recorded only when the response reports them. Aistee does not estimate
 - Anthropic prompting/thinking guidance: https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/prompt-templates-and-variables
 - Anthropic Models API: https://platform.claude.com/docs/en/api/models/retrieve
 - OpenRouter routing/fallbacks: https://openrouter.ai/docs/guides/routing/model-fallbacks
+- Vercel AI Gateway OpenAI-compatible API: https://vercel.com/docs/ai-gateway/sdks-and-apis/openai-chat-completions
 
 Keep this file focused on provider/runtime behavior. Product-facing provider status belongs in `README.md`; implementation details should live next to code when they become stable enough to stop being TODOs.

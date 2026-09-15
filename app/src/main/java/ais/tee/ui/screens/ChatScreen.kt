@@ -324,7 +324,8 @@ fun ChatScreen(
                                                 uiState.apiKeyConfig.deepseekKey.isNotBlank() ||
                                                 uiState.apiKeyConfig.kimiKey.isNotBlank() ||
                                                 uiState.apiKeyConfig.openRouterKey.isNotBlank() ||
-                                                uiState.apiKeyConfig.aiHubMixKey.isNotBlank()
+                                                uiState.apiKeyConfig.aiHubMixKey.isNotBlank() ||
+                                                uiState.apiKeyConfig.vercelAiGatewayKey.isNotBlank()
                                         if (hasAnyKey) {
                                             Badge(
                                                 containerColor = AccentEmerald,
@@ -488,7 +489,7 @@ fun ChatScreen(
                                 .padding(horizontal = 4.dp, vertical = 2.dp)
                         ) {
                             Text(
-                                text = "Model: ${uiState.selectedChatModel.ifBlank { "No free models" }}",
+                                text = "Model: ${uiState.selectedChatModel.ifBlank { "No models" }}",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 11.sp,
@@ -601,6 +602,7 @@ fun ChatScreen(
                                     AiProvider.KIMI -> "Ask Moonshot Kimi..."
                                     AiProvider.OPENROUTER -> "Ask a free OpenRouter model..."
                                     AiProvider.AIHUBMIX -> "Ask a free AIHubMix model..."
+                                    AiProvider.VERCEL -> "Ask via Vercel AI Gateway..."
                                 }
                                 Text(
                                     text = destination,
@@ -790,8 +792,8 @@ fun ChatScreen(
         ApiKeySettingsDialog(
             currentKeys = uiState.apiKeyConfig,
             onDismiss = { viewModel.setShowApiKeyDialog(false) },
-            onSave = { gemini, openAi, claude, deepseek, kimi, openRouter, aiHubMix ->
-                viewModel.saveApiKeys(gemini, openAi, claude, deepseek, kimi, openRouter, aiHubMix)
+            onSave = { gemini, openAi, claude, deepseek, kimi, openRouter, aiHubMix, vercel ->
+                viewModel.saveApiKeys(gemini, openAi, claude, deepseek, kimi, openRouter, aiHubMix, vercel)
             }
         )
     }
@@ -1176,7 +1178,8 @@ fun ApiKeySettingsDialog(
         deepseek: String,
         kimi: String,
         openRouter: String,
-        aiHubMix: String
+        aiHubMix: String,
+        vercel: String
     ) -> Unit
 ) {
     var geminiKey by remember { mutableStateOf(currentKeys.geminiKey) }
@@ -1186,6 +1189,7 @@ fun ApiKeySettingsDialog(
     var kimiKey by remember { mutableStateOf(currentKeys.kimiKey) }
     var openRouterKey by remember { mutableStateOf(currentKeys.openRouterKey) }
     var aiHubMixKey by remember { mutableStateOf(currentKeys.aiHubMixKey) }
+    var vercelAiGatewayKey by remember { mutableStateOf(currentKeys.vercelAiGatewayKey) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1316,11 +1320,26 @@ fun ApiKeySettingsDialog(
                         .fillMaxWidth()
                         .testTag("input_aihubmix_api_key")
                 )
+
+                OutlinedTextField(
+                    value = vercelAiGatewayKey,
+                    onValueChange = { vercelAiGatewayKey = it },
+                    label = { Text("Vercel AI Gateway Key") },
+                    placeholder = { Text("AI Gateway key") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    leadingIcon = {
+                        Icon(Icons.Default.Cloud, contentDescription = null, tint = Color(0xFF334155))
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_vercel_ai_gateway_key")
+                )
             }
         },
         confirmButton = {
             Button(
-                onClick = { onSave(geminiKey, openAiKey, claudeKey, deepseekKey, kimiKey, openRouterKey, aiHubMixKey) },
+                onClick = { onSave(geminiKey, openAiKey, claudeKey, deepseekKey, kimiKey, openRouterKey, aiHubMixKey, vercelAiGatewayKey) },
                 colors = ButtonDefaults.buttonColors(containerColor = AccentEmerald),
                 modifier = Modifier.testTag("btn_save_api_keys")
             ) {
@@ -1347,6 +1366,7 @@ fun getProviderColor(provider: AiProvider): Color {
         AiProvider.KIMI -> Color(0xFF8B5CF6)
         AiProvider.OPENROUTER -> Color(0xFF6366F1)
         AiProvider.AIHUBMIX -> Color(0xFF14B8A6)
+        AiProvider.VERCEL -> Color(0xFF334155)
         AiProvider.ALL -> Color(0xFF8B5CF6)
     }
 }
@@ -1360,6 +1380,7 @@ fun getProviderIcon(provider: AiProvider): ImageVector {
         AiProvider.KIMI -> Icons.Default.ElectricBolt
         AiProvider.OPENROUTER -> Icons.Default.Route
         AiProvider.AIHUBMIX -> Icons.Default.Cloud
+        AiProvider.VERCEL -> Icons.Default.Cloud
         AiProvider.ALL -> Icons.Default.Hub
     }
 }

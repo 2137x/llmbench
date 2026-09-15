@@ -33,7 +33,8 @@ internal class ApiKeyStore(context: Context) {
             deepseekKey = json.optString("deepseek"),
             kimiKey = json.optString("kimi"),
             openRouterKey = json.optString("openrouter"),
-            aiHubMixKey = json.optString("aihubmix")
+            aiHubMixKey = json.optString("aihubmix"),
+            vercelAiGatewayKey = json.optString("vercel_ai_gateway")
         )
     }.getOrDefault(ApiKeyConfig())
 
@@ -46,6 +47,7 @@ internal class ApiKeyStore(context: Context) {
             .put("kimi", config.kimiKey)
             .put("openrouter", config.openRouterKey)
             .put("aihubmix", config.aiHubMixKey)
+            .put("vercel_ai_gateway", config.vercelAiGatewayKey)
             .toString()
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())

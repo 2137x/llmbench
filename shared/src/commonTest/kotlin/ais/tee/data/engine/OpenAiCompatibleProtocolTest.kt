@@ -20,10 +20,13 @@ class OpenAiCompatibleProtocolTest {
     fun exposesProviderSpecificEndpointsAndHeaders() {
         val deepSeek = requireNotNull(OpenAiCompatibleProtocol.configFor(AiProvider.DEEPSEEK))
         val openRouter = requireNotNull(OpenAiCompatibleProtocol.configFor(AiProvider.OPENROUTER))
+        val vercel = requireNotNull(OpenAiCompatibleProtocol.configFor(AiProvider.VERCEL))
 
         assertEquals("https://api.deepseek.com/chat/completions", deepSeek.endpointUrl)
         assertEquals("https://openrouter.ai/api/v1/models?output_modalities=text", openRouter.modelCatalogUrl)
         assertEquals("https://github.com/travnie/aistee", openRouter.extraHeaders["HTTP-Referer"])
+        assertEquals("https://ai-gateway.vercel.sh/v1/chat/completions", vercel.endpointUrl)
+        assertEquals("https://ai-gateway.vercel.sh/v1/models", vercel.modelCatalogUrl)
         assertNull(OpenAiCompatibleProtocol.configFor(AiProvider.GEMINI))
     }
 

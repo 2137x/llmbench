@@ -41,6 +41,10 @@ object OpenAiCompatibleProtocol {
         AiProvider.AIHUBMIX to OpenAiCompatibleProviderConfig(
             endpointUrl = "https://aihubmix.com/v1/chat/completions",
             modelCatalogUrl = "https://aihubmix.com/api/v1/models?type=llm"
+        ),
+        AiProvider.VERCEL to OpenAiCompatibleProviderConfig(
+            endpointUrl = "https://ai-gateway.vercel.sh/v1/chat/completions",
+            modelCatalogUrl = "https://ai-gateway.vercel.sh/v1/models"
         )
     )
 

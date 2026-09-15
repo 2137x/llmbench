@@ -488,7 +488,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         updateActiveNativeConversation { conversation ->
             conversation.copy(selectedProvider = provider, selectedModel = newModel)
         }
-        if (provider.usesLiveFreeModelCatalog()) refreshGatewayModelCatalog(provider)
+        if (provider.usesLiveGatewayModelCatalog()) refreshGatewayModelCatalog(provider)
     }
 
     fun setChatModel(modelName: String) {
@@ -497,7 +497,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun refreshGatewayModelCatalog(provider: AiProvider) {
-        if (!provider.usesLiveFreeModelCatalog()) return
+        if (!provider.usesLiveGatewayModelCatalog()) return
         val state = _uiState.value
         if (provider in state.refreshingGatewayCatalogs) {
             pendingGatewayCatalogRefreshes += provider
@@ -510,7 +510,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
 
         viewModelScope.launch {
             try {
-                val models = aiChatService.fetchFreeGatewayModels(provider, apiKeys)
+                val models = aiChatService.fetchGatewayModels(provider, apiKeys)
                 _uiState.update { current ->
                     val selectedModel = if (current.selectedChatProvider == provider) {
                         when {
@@ -535,7 +535,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 persistNativeChat()
                 if (models.isEmpty()) {
-                    showSnackbar("No free text models are currently available for ${provider.shortName}.")
+                    showSnackbar("No compatible text models are currently available for ${provider.shortName}.")
                 }
             } catch (_: Exception) {
                 currentCoroutineContext().ensureActive()
@@ -568,7 +568,8 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         deepseekKey: String = "",
         kimiKey: String = "",
         openRouterKey: String = "",
-        aiHubMixKey: String = ""
+        aiHubMixKey: String = "",
+        vercelAiGatewayKey: String = ""
     ) {
         val config = ApiKeyConfig(
             geminiKey = geminiKey.trim(),
@@ -577,7 +578,8 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
             deepseekKey = deepseekKey.trim(),
             kimiKey = kimiKey.trim(),
             openRouterKey = openRouterKey.trim(),
-            aiHubMixKey = aiHubMixKey.trim()
+            aiHubMixKey = aiHubMixKey.trim(),
+            vercelAiGatewayKey = vercelAiGatewayKey.trim()
         )
         val stored = apiKeyStore.save(config)
         _uiState.update {
@@ -588,7 +590,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         }
         showSnackbar(if (stored) "API keys stored securely on device." else "API keys updated for this session only.")
         val selectedProvider = _uiState.value.selectedChatProvider
-        if (selectedProvider.usesLiveFreeModelCatalog()) {
+        if (selectedProvider.usesLiveGatewayModelCatalog()) {
             refreshGatewayModelCatalog(selectedProvider)
         }
     }
@@ -740,10 +742,10 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
     private fun resolveNativeChatSendPlan(state: StudioUiState): NativeChatSendPlan? {
         val targetProvider = state.selectedChatProvider
         if (
-            targetProvider.usesLiveFreeModelCatalog() &&
+            targetProvider.usesLiveGatewayModelCatalog() &&
             state.gatewayModelOptions[targetProvider]?.isEmpty() == true
         ) {
-            showSnackbar("No free text models are currently available for ${targetProvider.shortName}.")
+            showSnackbar("No compatible models are currently available for ${targetProvider.shortName}.")
             return null
         }
         val providersToRun = if (targetProvider == AiProvider.ALL) {
