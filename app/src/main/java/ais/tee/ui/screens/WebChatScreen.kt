@@ -8,7 +8,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.ComponentCallbacks2
 import android.content.res.Configuration
-import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import android.net.http.SslError
@@ -1724,36 +1723,6 @@ private fun WebProviderActivityIndicator(
         )
         WebChatActivityStatus.IDLE -> Unit
     }
-}
-
-/** Requires explicit user consent before an intent URI leaves Aistee. */
-@Composable
-private fun ExternalIntentConfirmationDialog(
-    uri: Uri?,
-    onDismiss: () -> Unit,
-    onConfirm: (Uri) -> Unit
-) {
-    val pendingUri = uri ?: return
-    val targetPackage = runCatching {
-        Intent.parseUri(pendingUri.toString(), Intent.URI_INTENT_SCHEME).`package`
-    }.getOrNull()
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Open another app?") },
-        text = {
-            Text(
-                targetPackage?.let { "This login wants to open $it." }
-                    ?: "This login wants to leave Aistee and open another app."
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(pendingUri) }) { Text("Open") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Stay here") }
-        }
-    )
 }
 
 private fun releaseTerminatedWebView(webView: WebView) {
