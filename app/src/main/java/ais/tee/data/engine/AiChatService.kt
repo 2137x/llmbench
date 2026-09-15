@@ -189,33 +189,6 @@ class AiChatService {
         val credentialFingerprint: String
     )
 
-    private data class OpenAiCompatibleProviderConfig(
-        val endpointUrl: String,
-        val modelCatalogUrl: String? = null,
-        val extraHeaders: Map<String, String> = emptyMap()
-    )
-
-    private val openAiCompatibleProviders = mapOf(
-        AiProvider.DEEPSEEK to OpenAiCompatibleProviderConfig(
-            endpointUrl = "https://api.deepseek.com/chat/completions"
-        ),
-        AiProvider.KIMI to OpenAiCompatibleProviderConfig(
-            endpointUrl = "https://api.moonshot.ai/v1/chat/completions"
-        ),
-        AiProvider.OPENROUTER to OpenAiCompatibleProviderConfig(
-            endpointUrl = "https://openrouter.ai/api/v1/chat/completions",
-            modelCatalogUrl = "https://openrouter.ai/api/v1/models?output_modalities=text",
-            extraHeaders = mapOf(
-                "HTTP-Referer" to "https://github.com/travnie/aistee",
-                "X-Title" to "Aistee"
-            )
-        ),
-        AiProvider.AIHUBMIX to OpenAiCompatibleProviderConfig(
-            endpointUrl = "https://aihubmix.com/v1/chat/completions",
-            modelCatalogUrl = "https://aihubmix.com/api/v1/models?type=llm"
-        )
-    )
-
     private val httpClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(60, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
@@ -239,7 +212,7 @@ class AiChatService {
         provider: AiProvider,
         apiKeys: ApiKeyConfig
     ): List<String> = withContext(Dispatchers.IO) {
-        val config = requireNotNull(openAiCompatibleProviders[provider]) {
+        val config = requireNotNull(OpenAiCompatibleProtocol.configFor(provider)) {
             "No OpenAI-compatible provider config for ${provider.id}"
         }
         val catalogUrl = requireNotNull(config.modelCatalogUrl) {
@@ -433,7 +406,7 @@ class AiChatService {
                         result.text
                     }
                     AiProvider.DEEPSEEK, AiProvider.KIMI, AiProvider.OPENROUTER, AiProvider.AIHUBMIX -> {
-                        val config = checkNotNull(openAiCompatibleProviders[provider])
+                        val config = checkNotNull(OpenAiCompatibleProtocol.configFor(provider))
                         val result = if (onTextDelta != null) {
                             callOpenAiCompatibleStreamApi(
                                 config, prompt, effectiveModel, key, systemInstruction,
@@ -732,16 +705,7 @@ class AiChatService {
         model: String,
         messages: JsonArray,
         stream: Boolean
-    ): JsonObject = buildJsonObject {
-        put(JSON_MODEL_KEY, model)
-        put(JSON_MESSAGES_KEY, messages)
-        if (stream) put(JSON_STREAM_KEY, true)
-        if (provider == AiProvider.OPENROUTER) {
-            putJsonObject(JSON_USAGE_KEY) {
-                put(JSON_INCLUDE_KEY, true)
-            }
-        }
-    }
+    ): JsonObject = OpenAiCompatibleProtocol.buildRequestPayload(provider, model, messages, stream)
 
     // --- Google Gemini REST API ---
     private suspend fun callGeminiApi(
@@ -1267,17 +1231,10 @@ class AiChatService {
         }
 
     internal fun extractOpenAiCompatibleStreamText(event: JsonObject): String? =
-        event[JSON_CHOICES_KEY]?.jsonArray
-            ?.firstOrNull()?.jsonObject
-            ?.get(JSON_DELTA_KEY)?.jsonObject
-            ?.get(JSON_CONTENT_KEY)?.jsonPrimitive?.contentOrNull
+        OpenAiCompatibleProtocol.extractStreamText(event)
 
     internal fun extractOpenAiCompatibleModel(event: JsonObject): String? =
-        (event[JSON_MODEL_KEY] as? JsonPrimitive)
-            ?.takeIf { it.isString }
-            ?.contentOrNull
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
+        OpenAiCompatibleProtocol.extractModel(event)
 
     private suspend fun callGeminiStreamApi(
         prompt: String,
@@ -1465,9 +1422,7 @@ class AiChatService {
         event[STREAM_TYPE_KEY]?.jsonPrimitive?.contentOrNull == OPENAI_RESPONSE_COMPLETED
 
     internal fun isOpenAiCompatibleStreamComplete(event: JsonObject): Boolean =
-        event[JSON_CHOICES_KEY]?.jsonArray.orEmpty().any { choice ->
-            choice.jsonObject[JSON_FINISH_REASON_KEY]?.jsonPrimitive?.contentOrNull != null
-        }
+        OpenAiCompatibleProtocol.isStreamComplete(event)
 
     internal fun isClaudeStreamComplete(event: JsonObject): Boolean =
         event[STREAM_TYPE_KEY]?.jsonPrimitive?.contentOrNull == CLAUDE_MESSAGE_STOP
@@ -1754,26 +1709,9 @@ class AiChatService {
         systemInstruction: String?,
         conversationHistory: List<ModelChatMessage>,
         provider: AiProvider
-    ): JsonArray = buildJsonArray {
-        if (!systemInstruction.isNullOrBlank()) {
-            addJsonObject {
-                put(JSON_ROLE_KEY, JSON_SYSTEM_KEY)
-                put(JSON_CONTENT_KEY, systemInstruction)
-            }
-        }
-
-        buildBoundedProviderTextTurns(
-            prompt = prompt,
-            conversationHistory = conversationHistory,
-            provider = provider,
-            systemInstruction = systemInstruction
-        ).forEach { turn ->
-            addJsonObject {
-                put(JSON_ROLE_KEY, turn.role)
-                put(JSON_CONTENT_KEY, turn.text)
-            }
-        }
-    }
+    ): JsonArray = OpenAiCompatibleProtocol.buildMessages(
+        prompt, systemInstruction, conversationHistory, provider
+    )
 
     private fun parseErrorMessage(rawJson: String): String? {
         return try {
