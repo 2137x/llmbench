@@ -142,11 +142,11 @@ internal fun providerGenerationActivityScript(
     consumeCompletion: Boolean,
     selected: Boolean? = null
 ): String? {
-    val selectors = ProviderWebTweakRegistry.generationSelectors(service)
+    val selectors = ProviderWebRegistry.generationSelectors(service)
     if (selectors.isEmpty()) return null
     return generationActivityScript(
         selectors = selectors,
-        idleSelectors = ProviderWebTweakRegistry.generationIdleSelectors(service),
+        idleSelectors = ProviderWebRegistry.generationIdleSelectors(service),
         consumeCompletion = consumeCompletion,
         selected = selected
     )
@@ -198,7 +198,7 @@ internal fun setProviderGenerationTrackerSelected(
  * A provider-scoped MutationObserver remembers completed generation between native polling intervals.
  */
 internal fun providerGenerationTrackingSupported(service: WebAiService): Boolean =
-    ProviderWebTweakRegistry.generationSelectors(service).isNotEmpty()
+    ProviderWebRegistry.generationSelectors(service).isNotEmpty()
 
 internal fun probeProviderGenerationActivity(
     webView: WebView,
