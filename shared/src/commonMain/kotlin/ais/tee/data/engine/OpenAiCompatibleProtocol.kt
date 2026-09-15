@@ -16,13 +16,13 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 
-internal data class OpenAiCompatibleProviderConfig(
+data class OpenAiCompatibleProviderConfig(
     val endpointUrl: String,
     val modelCatalogUrl: String? = null,
     val extraHeaders: Map<String, String> = emptyMap()
 )
 
-internal object OpenAiCompatibleProtocol {
+object OpenAiCompatibleProtocol {
     private val providerConfigs = mapOf(
         AiProvider.DEEPSEEK to OpenAiCompatibleProviderConfig(
             endpointUrl = "https://api.deepseek.com/chat/completions"
