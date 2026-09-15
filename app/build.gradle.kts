@@ -102,5 +102,9 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.rhino)
 
+    androidTestImplementation(libs.androidx.test.core)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+
     debugImplementation(libs.androidx.ui.tooling)
 }
