@@ -489,7 +489,7 @@ fun ChatScreen(
                                 .padding(horizontal = 4.dp, vertical = 2.dp)
                         ) {
                             Text(
-                                text = "Model: ${uiState.selectedChatModel.ifBlank { "No free models" }}",
+                                text = "Model: ${uiState.selectedChatModel.ifBlank { "No models" }}",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 11.sp,
