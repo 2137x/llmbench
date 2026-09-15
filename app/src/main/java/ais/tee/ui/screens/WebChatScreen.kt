@@ -1233,34 +1233,6 @@ fun WebChatScreen(
 }
 
 @Composable
-private fun WebRendererCrashFallback(
-    service: WebAiService,
-    onRetry: () -> Unit
-) {
-    Box(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Icon(Icons.Outlined.Refresh, contentDescription = null)
-            Text(
-                text = "${service.shortName} page stopped",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = "The web renderer crashed. Retry opens the provider home page without clearing its cookies or storage.",
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Button(onClick = onRetry) { Text("Retry") }
-        }
-    }
-}
-
-@Composable
 private fun rememberWebViewLifecycleStarted(
     webViewMap: Map<WebAiService, WebView>,
     selectedService: WebAiService
