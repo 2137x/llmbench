@@ -30,8 +30,8 @@ class ProviderWebActivityTest {
     fun probesUsePortableExactGenerationControls() {
         WebAiService.entries
             .flatMap { service ->
-                ProviderWebTweakRegistry.generationSelectors(service) +
-                    ProviderWebTweakRegistry.generationIdleSelectors(service)
+                ProviderWebRegistry.generationSelectors(service) +
+                    ProviderWebRegistry.generationIdleSelectors(service)
             }
             .forEach { selector ->
                 assertFalse("Broad stop selector: $selector", selector.contains("*="))
@@ -42,7 +42,7 @@ class ProviderWebActivityTest {
     @Test
     fun chatGptUsesItsStableStopButtonTestId() {
         assertTrue(
-            ProviderWebTweakRegistry.generationSelectors(WebAiService.CHATGPT)
+            ProviderWebRegistry.generationSelectors(WebAiService.CHATGPT)
                 .contains("[data-testid=\"stop-button\"]")
         )
     }
@@ -50,19 +50,19 @@ class ProviderWebActivityTest {
     @Test
     fun localeIndependentGenerationControlsArePreferredWhereVerified() {
         assertTrue(
-            ProviderWebTweakRegistry.generationSelectors(WebAiService.CLAUDE)
+            ProviderWebRegistry.generationSelectors(WebAiService.CLAUDE)
                 .first().contains("data-testid")
         )
         assertTrue(
-            ProviderWebTweakRegistry.generationSelectors(WebAiService.GEMINI)
+            ProviderWebRegistry.generationSelectors(WebAiService.GEMINI)
                 .first().contains("data-test-id")
         )
         assertFalse(
-            ProviderWebTweakRegistry.generationSelectors(WebAiService.DEEPSEEK)
+            ProviderWebRegistry.generationSelectors(WebAiService.DEEPSEEK)
                 .first().contains("aria-label")
         )
         assertFalse(
-            ProviderWebTweakRegistry.generationSelectors(WebAiService.KIMI)
+            ProviderWebRegistry.generationSelectors(WebAiService.KIMI)
                 .first().contains("aria-label")
         )
     }
@@ -98,8 +98,8 @@ class ProviderWebActivityTest {
 
     @Test
     fun vibeUsesLocaleIndependentSubmitStopIcon() {
-        val activeSelector = ProviderWebTweakRegistry.generationSelectors(WebAiService.VIBE).single()
-        val idleSelector = ProviderWebTweakRegistry.generationIdleSelectors(WebAiService.VIBE).single()
+        val activeSelector = ProviderWebRegistry.generationSelectors(WebAiService.VIBE).single()
+        val idleSelector = ProviderWebRegistry.generationIdleSelectors(WebAiService.VIBE).single()
         assertTrue(activeSelector.contains("button[type=\"submit\"]"))
         assertTrue(activeSelector.endsWith("svg rect"))
         assertTrue(idleSelector.contains("path[d^=\"M12 18v4h4v-4h-4ZM16 14v4h4v-4h-4\"]"))

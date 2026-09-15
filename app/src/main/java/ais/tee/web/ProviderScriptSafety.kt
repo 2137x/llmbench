@@ -30,7 +30,7 @@ internal fun providerRuntimeGuardScript(
     service: WebAiService,
     offProviderResult: String
 ): String {
-    val allowedHosts = ProviderWebTweakRegistry.ownedHosts(service)
+    val allowedHosts = ProviderWebRegistry.ownedHosts(service)
         .joinToString(prefix = "[", postfix = "]") { javascriptStringLiteral(it) }
     return """
         var allowedHosts = $allowedHosts;

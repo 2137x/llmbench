@@ -137,7 +137,7 @@ class ProviderWebTweaksTest {
     @Test
     fun everyProviderHasAuditableTweaksAndOwnedHosts() {
         WebAiService.entries.forEach { service ->
-            assertTrue(ProviderWebTweakRegistry.ownedHosts(service).isNotEmpty())
+            assertTrue(ProviderWebRegistry.ownedHosts(service).isNotEmpty())
             assertTrue(ProviderWebTweakRegistry.forProvider(service).isNotEmpty())
         }
     }

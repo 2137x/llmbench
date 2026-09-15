@@ -16,7 +16,7 @@ class ProviderOnboardingNavigationTest {
         WebAiService.entries.forEach { service ->
             assertEquals(
                 service in verified,
-                ProviderWebTweakRegistry.hasVerifiedTopLevelNavigationPolicy(service)
+                ProviderWebRegistry.hasVerifiedTopLevelNavigationPolicy(service)
             )
         }
     }
@@ -24,25 +24,25 @@ class ProviderOnboardingNavigationTest {
     @Test
     fun androidNavigationVerificationRemainsIdentityMethodScoped() {
         assertTrue(
-            ProviderWebTweakRegistry.isIdentityMethodVerifiedForNavigation(
+            ProviderWebRegistry.isIdentityMethodVerifiedForNavigation(
                 WebAiService.QWEN,
                 ProviderIdentityMethod.GOOGLE
             )
         )
         assertTrue(
-            ProviderWebTweakRegistry.isIdentityMethodVerifiedForNavigation(
+            ProviderWebRegistry.isIdentityMethodVerifiedForNavigation(
                 WebAiService.QWEN,
                 ProviderIdentityMethod.GITHUB
             )
         )
         assertFalse(
-            ProviderWebTweakRegistry.isIdentityMethodVerifiedForNavigation(
+            ProviderWebRegistry.isIdentityMethodVerifiedForNavigation(
                 WebAiService.QWEN,
                 ProviderIdentityMethod.MICROSOFT
             )
         )
         assertFalse(
-            ProviderWebTweakRegistry.isIdentityMethodVerifiedForNavigation(
+            ProviderWebRegistry.isIdentityMethodVerifiedForNavigation(
                 WebAiService.COPILOT,
                 ProviderIdentityMethod.GOOGLE
             )
@@ -53,13 +53,13 @@ class ProviderOnboardingNavigationTest {
     fun identityMetadataCannotWidenAndroidAuthHostsWithoutPairVerification() {
         assertTrue(WebAiService.QWEN.onboardingCapabilities().hasIdentityAssistedPath)
         assertFalse(
-            ProviderWebTweakRegistry.isIdentityMethodVerifiedForNavigation(
+            ProviderWebRegistry.isIdentityMethodVerifiedForNavigation(
                 WebAiService.QWEN,
                 ProviderIdentityMethod.MICROSOFT
             )
         )
         assertFalse(
-            "login.live.com" in ProviderWebTweakRegistry.topLevelNavigationAuthHosts(WebAiService.QWEN)
+            "login.live.com" in ProviderWebRegistry.topLevelNavigationAuthHosts(WebAiService.QWEN)
         )
     }
 
@@ -67,15 +67,15 @@ class ProviderOnboardingNavigationTest {
     fun verifiedIdentityMethodsResolveToExpectedAndroidAuthHosts() {
         assertEquals(
             setOf("accounts.google.com", "github.com"),
-            ProviderWebTweakRegistry.topLevelNavigationAuthHosts(WebAiService.QWEN)
+            ProviderWebRegistry.topLevelNavigationAuthHosts(WebAiService.QWEN)
         )
         assertEquals(
             setOf("login.live.com", "login.microsoftonline.com"),
-            ProviderWebTweakRegistry.topLevelNavigationAuthHosts(WebAiService.COPILOT)
+            ProviderWebRegistry.topLevelNavigationAuthHosts(WebAiService.COPILOT)
         )
         assertEquals(
             setOf("accounts.google.com", "github.com"),
-            ProviderWebTweakRegistry.topLevelNavigationAuthHosts(WebAiService.ZAI)
+            ProviderWebRegistry.topLevelNavigationAuthHosts(WebAiService.ZAI)
         )
     }
 }
